@@ -1,6 +1,22 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  plugins: [
+    {
+      name: 'project-form-route-rewrite',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          const requestUrl = req.url || '';
+
+          if (/^\/project\/[^/]+\/(add|edit)\/?$/.test(requestUrl)) {
+            req.url = '/project/';
+          }
+
+          next();
+        });
+      }
+    }
+  ],
   server: {
     port: 5173,
     open: '/'
@@ -12,7 +28,9 @@ export default defineConfig({
         dashboard: 'dashboard/index.html',
         login: 'login/index.html',
         register: 'register/index.html',
-        projects: 'projects/index.html'
+        projects: 'projects/index.html',
+        project: 'project/index.html',
+        projectTasks: 'project-tasks/index.html'
       }
     }
   }

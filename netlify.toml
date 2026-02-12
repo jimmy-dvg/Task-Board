@@ -1,0 +1,9 @@
+[[redirects]]
+  from = "/project/:id/add"
+  to = "/project/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/project/:id/edit"
+  to = "/project/index.html"
+  status = 200

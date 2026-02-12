@@ -1,0 +1,30 @@
+<main class="page-main py-5">
+  <section class="container project-form-wrap">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 id="projectFormTitle" class="h3 mb-0">Project</h1>
+      <a class="btn btn-outline-primary" href="/projects/">Back to Projects</a>
+    </div>
+
+    <div id="projectFormMessage" class="alert d-none" role="alert"></div>
+
+    <form id="projectForm" class="card p-3 p-md-4" novalidate>
+      <div class="mb-3">
+        <label for="projectName" class="form-label">Title</label>
+        <input
+          id="projectName"
+          name="projectName"
+          type="text"
+          class="form-control"
+          maxlength="120"
+          placeholder="Project name"
+          required
+        />
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end">
+        <a class="btn btn-outline-secondary" href="/projects/">Cancel</a>
+        <button id="projectFormSubmit" type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </section>
+</main>

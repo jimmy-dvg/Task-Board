@@ -1,0 +1,15 @@
+.table td,
+.table th {
+  white-space: nowrap;
+}
+
+.project-title {
+  min-width: 220px;
+  max-width: 380px;
+  white-space: normal;
+}
+
+.actions-group {
+  display: inline-flex;
+  gap: 0.5rem;
+}

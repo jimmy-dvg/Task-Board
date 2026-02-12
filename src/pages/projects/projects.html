@@ -1,0 +1,50 @@
+<main class="page-main py-5">
+  <section class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h3 mb-0">Projects</h1>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/dashboard/">Back to Dashboard</a>
+        <a class="btn btn-primary" href="/project/new/add">Add Project</a>
+      </div>
+    </div>
+
+    <div id="projectsMessage" class="alert d-none" role="alert"></div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Title</th>
+            <th scope="col">Open Tasks</th>
+            <th scope="col">Tasks Done</th>
+            <th scope="col">Stages</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="projectsTableBody">
+          <tr>
+            <td colspan="5" class="text-body-secondary">Loading projects...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="deleteProjectModalLabel" class="modal-title fs-5">Delete project</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to delete <strong id="deleteProjectName"></strong>? This cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="confirmDeleteProject" type="button" class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
