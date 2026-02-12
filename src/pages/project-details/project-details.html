@@ -38,4 +38,53 @@
       <div id="projectBoardColumns" class="board-columns"></div>
     </div>
   </section>
+
+  <div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="taskForm" novalidate>
+          <div class="modal-header">
+            <h2 id="taskModalLabel" class="modal-title fs-5">Task</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="taskTitle" class="form-label">Title</label>
+              <input id="taskTitle" name="taskTitle" type="text" class="form-control" maxlength="180" required />
+            </div>
+            <div class="mb-3">
+              <label for="taskDescription" class="form-label">Description</label>
+              <textarea id="taskDescription" name="taskDescription" class="form-control" rows="4"></textarea>
+            </div>
+            <div class="form-check">
+              <input id="taskDone" name="taskDone" type="checkbox" class="form-check-input" />
+              <label for="taskDone" class="form-check-label">Done</label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button id="taskFormSubmit" type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="taskDeleteModal" tabindex="-1" aria-labelledby="taskDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="taskDeleteModalLabel" class="modal-title fs-5">Delete task</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to delete <strong id="taskDeleteName"></strong>?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="confirmTaskDelete" type="button" class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>
