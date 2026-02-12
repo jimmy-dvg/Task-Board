@@ -27,6 +27,17 @@ function parseProjectRoute(pathname) {
   };
 }
 
+async function createDefaultStages(projectId) {
+  const defaultStages = [
+    { project_id: projectId, name: 'Not Started', order_position: 1 },
+    { project_id: projectId, name: 'In Progress', order_position: 2 },
+    { project_id: projectId, name: 'Done', order_position: 3 }
+  ];
+
+  const { error } = await supabase.from('project_stages').insert(defaultStages);
+  return { error };
+}
+
 export async function renderProjectFormPage() {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = template;
@@ -37,6 +48,7 @@ export async function renderProjectFormPage() {
   const formElement = page.querySelector('#projectForm');
   const nameInput = page.querySelector('#projectName');
   const submitButton = page.querySelector('#projectFormSubmit');
+  const submitAndTasksButton = page.querySelector('#projectFormSubmitAndTasks');
 
   const route = parseProjectRoute(window.location.pathname);
 
@@ -61,6 +73,7 @@ export async function renderProjectFormPage() {
   if (isEditMode) {
     titleElement.textContent = 'Edit Project';
     submitButton.textContent = 'Update';
+    submitAndTasksButton.classList.add('d-none');
 
     showMessage(messageElement, 'Loading project...', 'secondary');
 
@@ -79,10 +92,14 @@ export async function renderProjectFormPage() {
   if (isAddMode) {
     titleElement.textContent = 'Add Project';
     submitButton.textContent = 'Create';
+    submitAndTasksButton.classList.remove('d-none');
   }
 
   formElement.addEventListener('submit', async (event) => {
     event.preventDefault();
+
+    const submitter = event.submitter;
+    const shouldOpenTasksAfterCreate = submitter?.getAttribute('data-after-create') === 'tasks';
 
     const projectName = nameInput.value.trim();
 
@@ -92,6 +109,7 @@ export async function renderProjectFormPage() {
     }
 
     submitButton.disabled = true;
+    submitAndTasksButton.disabled = true;
 
     if (isEditMode) {
       showMessage(messageElement, 'Updating project...', 'secondary');
@@ -103,6 +121,7 @@ export async function renderProjectFormPage() {
         .eq('owner_id', session.user.id);
 
       submitButton.disabled = false;
+      submitAndTasksButton.disabled = false;
 
       if (error) {
         showMessage(messageElement, error.message, 'danger');
@@ -115,15 +134,32 @@ export async function renderProjectFormPage() {
 
     showMessage(messageElement, 'Creating project...', 'secondary');
 
-    const { error } = await supabase.from('projects').insert({
-      name: projectName,
-      owner_id: session.user.id
-    });
+    const { data: createdProject, error } = await supabase
+      .from('projects')
+      .insert({
+        name: projectName,
+        owner_id: session.user.id
+      })
+      .select('id')
+      .single();
 
     submitButton.disabled = false;
+    submitAndTasksButton.disabled = false;
 
     if (error) {
       showMessage(messageElement, error.message, 'danger');
+      return;
+    }
+
+    const { error: defaultStagesError } = await createDefaultStages(createdProject.id);
+
+    if (defaultStagesError) {
+      showMessage(messageElement, defaultStagesError.message || 'Project created, but default stages could not be created.', 'danger');
+      return;
+    }
+
+    if (shouldOpenTasksAfterCreate && createdProject?.id) {
+      window.location.href = `/project/${createdProject.id}/tasks`;
       return;
     }
 

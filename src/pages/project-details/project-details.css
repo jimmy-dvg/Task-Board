@@ -96,15 +96,14 @@
   margin-bottom: 0.5rem;
 }
 
-.board-task-controls {
+.board-task-stage-actions {
   display: flex;
   gap: 0.4rem;
   margin-top: 0.75rem;
 }
 
-.board-task-controls .btn {
-  line-height: 1;
-  min-width: 2rem;
+.board-task-stage-actions .btn {
+  flex: 1;
 }
 
 .board-task-description p:last-child {

@@ -88,6 +88,7 @@ export async function renderProjectsPage() {
         <td>${stats.stagesCount}</td>
         <td class="text-end">
           <div class="actions-group">
+            <a class="btn btn-sm btn-outline-success" href="/project/${project.id}/tasks">Add Tasks</a>
             <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/tasks">View Tasks</a>
             ${ownerActions}
           </div>

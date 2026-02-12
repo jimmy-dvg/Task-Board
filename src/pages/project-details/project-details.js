@@ -72,14 +72,14 @@ function createCardActionButton(label, action, icon, buttonClass = 'btn-outline-
   return button;
 }
 
-function createMoveButton(label, direction, icon) {
+function createStageActionButton(label, action, buttonClass = 'btn-outline-secondary') {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'btn btn-sm btn-outline-secondary';
-  button.setAttribute('data-move', direction);
+  button.className = `btn btn-sm ${buttonClass}`;
+  button.setAttribute('data-action', action);
   button.setAttribute('aria-label', label);
   button.setAttribute('title', label);
-  button.textContent = icon;
+  button.textContent = label;
   return button;
 }
 
@@ -138,16 +138,14 @@ function renderColumns(boardColumnsElement, stages, tasks) {
       status.className = task.done ? 'text-success' : 'text-body-secondary';
       status.textContent = task.done ? 'Done' : 'Open';
 
-      const controls = document.createElement('div');
-      controls.className = 'board-task-controls';
-      controls.append(
-        createMoveButton('Move task up', 'up', '↑'),
-        createMoveButton('Move task down', 'down', '↓'),
-        createMoveButton('Move task left', 'left', '←'),
-        createMoveButton('Move task right', 'right', '→')
+      const stageActions = document.createElement('div');
+      stageActions.className = 'board-task-stage-actions';
+      stageActions.append(
+        createStageActionButton('In Progress', 'mark-in-progress', 'btn-outline-secondary'),
+        createStageActionButton('Done', 'mark-done', 'btn-outline-success')
       );
 
-      card.append(taskHeader, description, status, controls);
+      card.append(taskHeader, description, status, stageActions);
       taskList.append(card);
     });
 
@@ -366,89 +364,6 @@ function enableDragAndDrop(boardColumnsElement, tasks, messageElement, onPersist
   });
 }
 
-function moveTaskCard(boardColumnsElement, cardElement, direction) {
-  const currentList = cardElement.closest('.board-task-list');
-
-  if (!currentList) {
-    return false;
-  }
-
-  const listCards = [...currentList.querySelectorAll('.board-task')];
-  const currentIndex = listCards.indexOf(cardElement);
-
-  if (currentIndex < 0) {
-    return false;
-  }
-
-  if (direction === 'up' && currentIndex > 0) {
-    currentList.insertBefore(cardElement, listCards[currentIndex - 1]);
-    return true;
-  }
-
-  if (direction === 'down' && currentIndex < listCards.length - 1) {
-    const nextSibling = listCards[currentIndex + 1].nextSibling;
-    currentList.insertBefore(cardElement, nextSibling);
-    return true;
-  }
-
-  const stageLists = [...boardColumnsElement.querySelectorAll('.board-task-list')];
-  const stageIndex = stageLists.indexOf(currentList);
-
-  if (stageIndex < 0) {
-    return false;
-  }
-
-  if (direction === 'left' && stageIndex > 0) {
-    stageLists[stageIndex - 1].append(cardElement);
-    return true;
-  }
-
-  if (direction === 'right' && stageIndex < stageLists.length - 1) {
-    stageLists[stageIndex + 1].append(cardElement);
-    return true;
-  }
-
-  return false;
-}
-
-function enableKeyboardReorder(boardColumnsElement, tasks, messageElement, onPersistError) {
-  let isSaving = false;
-
-  boardColumnsElement.addEventListener('click', async (event) => {
-    const moveButton = event.target.closest('[data-move]');
-
-    if (!moveButton || isSaving) {
-      return;
-    }
-
-    const cardElement = moveButton.closest('.board-task');
-    if (!cardElement) {
-      return;
-    }
-
-    const direction = moveButton.getAttribute('data-move');
-    const moved = moveTaskCard(boardColumnsElement, cardElement, direction);
-
-    if (!moved) {
-      return;
-    }
-
-    ensureEmptyStates(boardColumnsElement);
-    isSaving = true;
-
-    const result = await persistTaskOrder(boardColumnsElement, tasks, messageElement);
-
-    if (!result.success) {
-      onPersistError();
-      isSaving = false;
-      return;
-    }
-
-    isSaving = false;
-    moveButton.focus();
-  });
-}
-
 function setSummary(statsElements, stagesCount, tasks) {
   const total = tasks.length;
   const done = tasks.filter((task) => task.done).length;
@@ -484,6 +399,39 @@ function getNextTaskOrderPosition(tasks, stageId) {
   );
 
   return maxOrderPosition + 1;
+}
+
+async function ensureProjectStages(projectId, stages, messageElement) {
+  if (stages.length) {
+    return stages;
+  }
+
+  showMessage(messageElement, 'Creating default stages...', 'secondary');
+
+  const defaultStages = [
+    { project_id: projectId, name: 'Not Started', order_position: 1 },
+    { project_id: projectId, name: 'In Progress', order_position: 2 },
+    { project_id: projectId, name: 'Done', order_position: 3 }
+  ];
+
+  const { error: createError } = await supabase.from('project_stages').insert(defaultStages);
+  if (createError) {
+    showMessage(messageElement, createError.message || 'Failed to create default stages.', 'danger');
+    return [];
+  }
+
+  const { data: refreshedStages, error: reloadError } = await supabase
+    .from('project_stages')
+    .select('id, name, order_position')
+    .eq('project_id', projectId)
+    .order('order_position', { ascending: true });
+
+  if (reloadError) {
+    showMessage(messageElement, reloadError.message || 'Failed to reload stages.', 'danger');
+    return [];
+  }
+
+  return refreshedStages || [];
 }
 
 export async function renderProjectDetailsPage() {
@@ -560,7 +508,7 @@ export async function renderProjectDetailsPage() {
 
   titleElement.textContent = projectResult.data?.name || 'Project';
 
-  const stages = stagesResult.data || [];
+  const stages = await ensureProjectStages(projectId, stagesResult.data || [], messageElement);
   const tasks = tasksResult.data || [];
   let taskFormMode = 'add';
   let activeTaskId = '';
@@ -643,6 +591,54 @@ export async function renderProjectDetailsPage() {
       pendingDeleteTaskId = task.id;
       taskDeleteNameElement.textContent = task.title || 'this task';
       taskDeleteModal.show();
+      return;
+    }
+
+    if (action === 'mark-in-progress' || action === 'mark-done') {
+      (async () => {
+        const cardElement = actionElement.closest('.board-task');
+        const taskId = cardElement?.getAttribute('data-task-id');
+        const task = tasks.find((item) => item.id === taskId);
+
+        if (!task) {
+          return;
+        }
+
+        const targetStageName = action === 'mark-done' ? 'done' : 'in progress';
+        const targetDoneState = action === 'mark-done';
+        const targetStage = stages.find((stage) => stage.name.trim().toLowerCase() === targetStageName);
+
+        if (!targetStage) {
+          showMessage(messageElement, `Stage "${targetStageName}" was not found for this project.`, 'warning');
+          return;
+        }
+
+        const targetOrderPosition = getNextTaskOrderPosition(tasks, targetStage.id);
+
+        showMessage(messageElement, 'Updating task...', 'secondary');
+        const { data: updatedTask, error } = await supabase
+          .from('tasks')
+          .update({
+            stage_id: targetStage.id,
+            order_position: targetOrderPosition,
+            done: targetDoneState
+          })
+          .eq('id', task.id)
+          .select('id, stage_id, order_position, done')
+          .single();
+
+        if (error) {
+          showMessage(messageElement, error.message || 'Failed to update task.', 'danger');
+          return;
+        }
+
+        task.stage_id = updatedTask.stage_id;
+        task.order_position = updatedTask.order_position;
+        task.done = updatedTask.done;
+
+        rerenderBoard();
+        showMessage(messageElement, '');
+      })();
     }
   });
 
@@ -771,9 +767,6 @@ export async function renderProjectDetailsPage() {
 
   rerenderBoard();
   enableDragAndDrop(boardColumnsElement, tasks, messageElement, () => {
-    rerenderBoard();
-  });
-  enableKeyboardReorder(boardColumnsElement, tasks, messageElement, () => {
     rerenderBoard();
   });
   showMessage(messageElement, '');
