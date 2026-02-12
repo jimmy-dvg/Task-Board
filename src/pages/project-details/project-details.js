@@ -13,6 +13,35 @@ function showMessage(messageElement, message, variant = 'secondary') {
   messageElement.textContent = message;
 }
 
+function ensureEmptyStates(boardColumnsElement) {
+  boardColumnsElement.querySelectorAll('.board-task-list').forEach((taskList) => {
+    const cards = taskList.querySelectorAll('.board-task');
+    const emptyState = taskList.querySelector('.board-empty');
+
+    if (!cards.length && !emptyState) {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'board-empty';
+      placeholder.textContent = 'No tasks.';
+      taskList.append(placeholder);
+    }
+
+    if (cards.length && emptyState) {
+      emptyState.remove();
+    }
+  });
+}
+
+function createMoveButton(label, direction, icon) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn-sm btn-outline-secondary';
+  button.setAttribute('data-move', direction);
+  button.setAttribute('aria-label', label);
+  button.setAttribute('title', label);
+  button.textContent = icon;
+  return button;
+}
+
 function renderColumns(boardColumnsElement, stages, tasks) {
   boardColumnsElement.innerHTML = '';
 
@@ -56,13 +85,24 @@ function renderColumns(boardColumnsElement, stages, tasks) {
       status.className = task.done ? 'text-success' : 'text-body-secondary';
       status.textContent = task.done ? 'Done' : 'Open';
 
-      card.append(title, description, status);
+      const controls = document.createElement('div');
+      controls.className = 'board-task-controls';
+      controls.append(
+        createMoveButton('Move task up', 'up', '↑'),
+        createMoveButton('Move task down', 'down', '↓'),
+        createMoveButton('Move task left', 'left', '←'),
+        createMoveButton('Move task right', 'right', '→')
+      );
+
+      card.append(title, description, status, controls);
       taskList.append(card);
     });
 
     column.append(header, taskList);
     boardColumnsElement.append(column);
   });
+
+  ensureEmptyStates(boardColumnsElement);
 }
 
 function getDragAfterElement(taskListElement, cursorY) {
@@ -156,6 +196,7 @@ async function persistTaskOrder(boardColumnsElement, tasks, messageElement) {
 
 function enableDragAndDrop(boardColumnsElement, tasks, messageElement, onPersistError) {
   let dragStarted = false;
+  let isSaving = false;
 
   boardColumnsElement.addEventListener('dragstart', (event) => {
     const cardElement = event.target.closest('.board-task');
@@ -214,13 +255,105 @@ function enableDragAndDrop(boardColumnsElement, tasks, messageElement, onPersist
       return;
     }
 
+    if (isSaving) {
+      dragStarted = false;
+      return;
+    }
+
+    isSaving = true;
+    ensureEmptyStates(boardColumnsElement);
+
     const result = await persistTaskOrder(boardColumnsElement, tasks, messageElement);
 
     if (!result.success) {
       onPersistError();
     }
 
+    isSaving = false;
     dragStarted = false;
+  });
+}
+
+function moveTaskCard(boardColumnsElement, cardElement, direction) {
+  const currentList = cardElement.closest('.board-task-list');
+
+  if (!currentList) {
+    return false;
+  }
+
+  const listCards = [...currentList.querySelectorAll('.board-task')];
+  const currentIndex = listCards.indexOf(cardElement);
+
+  if (currentIndex < 0) {
+    return false;
+  }
+
+  if (direction === 'up' && currentIndex > 0) {
+    currentList.insertBefore(cardElement, listCards[currentIndex - 1]);
+    return true;
+  }
+
+  if (direction === 'down' && currentIndex < listCards.length - 1) {
+    const nextSibling = listCards[currentIndex + 1].nextSibling;
+    currentList.insertBefore(cardElement, nextSibling);
+    return true;
+  }
+
+  const stageLists = [...boardColumnsElement.querySelectorAll('.board-task-list')];
+  const stageIndex = stageLists.indexOf(currentList);
+
+  if (stageIndex < 0) {
+    return false;
+  }
+
+  if (direction === 'left' && stageIndex > 0) {
+    stageLists[stageIndex - 1].append(cardElement);
+    return true;
+  }
+
+  if (direction === 'right' && stageIndex < stageLists.length - 1) {
+    stageLists[stageIndex + 1].append(cardElement);
+    return true;
+  }
+
+  return false;
+}
+
+function enableKeyboardReorder(boardColumnsElement, tasks, messageElement, onPersistError) {
+  let isSaving = false;
+
+  boardColumnsElement.addEventListener('click', async (event) => {
+    const moveButton = event.target.closest('[data-move]');
+
+    if (!moveButton || isSaving) {
+      return;
+    }
+
+    const cardElement = moveButton.closest('.board-task');
+    if (!cardElement) {
+      return;
+    }
+
+    const direction = moveButton.getAttribute('data-move');
+    const moved = moveTaskCard(boardColumnsElement, cardElement, direction);
+
+    if (!moved) {
+      return;
+    }
+
+    ensureEmptyStates(boardColumnsElement);
+    isSaving = true;
+
+    const result = await persistTaskOrder(boardColumnsElement, tasks, messageElement);
+
+    if (!result.success) {
+      onPersistError();
+      isSaving = false;
+      return;
+    }
+
+    isSaving = false;
+    moveButton.focus();
   });
 }
 
@@ -311,6 +444,9 @@ export async function renderProjectDetailsPage() {
   setSummary(statsElements, stages.length, tasks);
   renderColumns(boardColumnsElement, stages, tasks);
   enableDragAndDrop(boardColumnsElement, tasks, messageElement, () => {
+    renderColumns(boardColumnsElement, stages, tasks);
+  });
+  enableKeyboardReorder(boardColumnsElement, tasks, messageElement, () => {
     renderColumns(boardColumnsElement, stages, tasks);
   });
   showMessage(messageElement, '');
