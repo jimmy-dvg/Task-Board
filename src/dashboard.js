@@ -7,9 +7,16 @@ const app = document.querySelector('#app');
 
 document.title = 'Taskboard | Dashboard';
 
-if (app) {
+async function initDashboard() {
+  if (!app) {
+    return;
+  }
+
   app.className = 'app-shell';
   app.append(renderHeader('/dashboard'));
-  app.append(renderDashboardPage());
+  const dashboardPage = await renderDashboardPage();
+  app.append(dashboardPage);
   app.append(renderFooter());
 }
+
+initDashboard();

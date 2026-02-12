@@ -9,7 +9,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: 'index.html',
-        dashboard: 'dashboard/index.html'
+        dashboard: 'dashboard/index.html',
+        login: 'login/index.html',
+        register: 'register/index.html'
       }
     }
   }
