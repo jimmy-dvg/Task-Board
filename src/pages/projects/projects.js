@@ -78,7 +78,7 @@ export async function renderProjectsPage() {
         <td class="text-end">
           <div class="actions-group">
             <a class="btn btn-sm btn-outline-primary" href="/project/${project.id}/edit">Edit</a>
-            <a class="btn btn-sm btn-outline-secondary" href="/project-tasks/?id=${project.id}">View Tasks</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/tasks">View Tasks</a>
             <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-project-id="${project.id}" data-project-name="${safeName}">
               Delete
             </button>

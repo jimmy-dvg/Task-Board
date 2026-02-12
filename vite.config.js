@@ -12,6 +12,10 @@ export default defineConfig({
             req.url = '/project/';
           }
 
+          if (/^\/project\/[^/]+\/tasks\/?$/.test(requestUrl)) {
+            req.url = '/project-tasks/';
+          }
+
           next();
         });
       }

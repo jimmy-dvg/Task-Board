@@ -26,6 +26,7 @@ function renderColumns(boardColumnsElement, stages, tasks) {
 
     const taskList = document.createElement('div');
     taskList.className = 'board-task-list';
+    taskList.setAttribute('data-stage-id', stage.id);
 
     const stageTasks = tasks
       .filter((task) => task.stage_id === stage.id)
@@ -41,6 +42,8 @@ function renderColumns(boardColumnsElement, stages, tasks) {
     stageTasks.forEach((task) => {
       const card = document.createElement('article');
       card.className = 'board-task';
+      card.setAttribute('draggable', 'true');
+      card.setAttribute('data-task-id', task.id);
 
       const title = document.createElement('h3');
       title.textContent = task.title;
@@ -62,6 +65,165 @@ function renderColumns(boardColumnsElement, stages, tasks) {
   });
 }
 
+function getDragAfterElement(taskListElement, cursorY) {
+  const draggableCards = [...taskListElement.querySelectorAll('.board-task:not(.dragging)')];
+
+  return draggableCards.reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = cursorY - box.top - box.height / 2;
+
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+
+      return closest;
+    },
+    { offset: Number.NEGATIVE_INFINITY, element: null }
+  ).element;
+}
+
+function buildTaskUpdatesFromDom(boardColumnsElement, currentTasks) {
+  const updates = [];
+  const tasksById = new Map(currentTasks.map((task) => [task.id, task]));
+
+  boardColumnsElement.querySelectorAll('.board-task-list').forEach((taskList) => {
+    const stageId = taskList.getAttribute('data-stage-id');
+    const cards = [...taskList.querySelectorAll('.board-task')];
+
+    cards.forEach((card, index) => {
+      const taskId = card.getAttribute('data-task-id');
+      const sourceTask = tasksById.get(taskId);
+
+      if (!sourceTask) {
+        return;
+      }
+
+      const newPosition = index + 1;
+      if (sourceTask.stage_id !== stageId || sourceTask.order_position !== newPosition) {
+        updates.push({
+          id: taskId,
+          stage_id: stageId,
+          order_position: newPosition
+        });
+      }
+    });
+  });
+
+  return updates;
+}
+
+async function persistTaskOrder(boardColumnsElement, tasks, messageElement) {
+  const updates = buildTaskUpdatesFromDom(boardColumnsElement, tasks);
+
+  if (!updates.length) {
+    return { success: true };
+  }
+
+  showMessage(messageElement, 'Saving task positions...', 'secondary');
+
+  const updateResults = await Promise.all(
+    updates.map((updateItem) =>
+      supabase
+        .from('tasks')
+        .update({
+          stage_id: updateItem.stage_id,
+          order_position: updateItem.order_position
+        })
+        .eq('id', updateItem.id)
+    )
+  );
+
+  const failedUpdate = updateResults.find((result) => result.error);
+  if (failedUpdate?.error) {
+    showMessage(messageElement, failedUpdate.error.message || 'Failed to save task positions.', 'danger');
+    return { success: false };
+  }
+
+  updates.forEach((updateItem) => {
+    const task = tasks.find((currentTask) => currentTask.id === updateItem.id);
+    if (!task) {
+      return;
+    }
+
+    task.stage_id = updateItem.stage_id;
+    task.order_position = updateItem.order_position;
+  });
+
+  showMessage(messageElement, '');
+  return { success: true };
+}
+
+function enableDragAndDrop(boardColumnsElement, tasks, messageElement, onPersistError) {
+  let dragStarted = false;
+
+  boardColumnsElement.addEventListener('dragstart', (event) => {
+    const cardElement = event.target.closest('.board-task');
+
+    if (!cardElement) {
+      return;
+    }
+
+    dragStarted = true;
+    cardElement.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', cardElement.getAttribute('data-task-id') || '');
+  });
+
+  boardColumnsElement.addEventListener('dragover', (event) => {
+    const taskList = event.target.closest('.board-task-list');
+
+    if (!taskList) {
+      return;
+    }
+
+    event.preventDefault();
+    const draggingElement = boardColumnsElement.querySelector('.board-task.dragging');
+
+    if (!draggingElement) {
+      return;
+    }
+
+    const afterElement = getDragAfterElement(taskList, event.clientY);
+
+    if (!afterElement) {
+      taskList.append(draggingElement);
+    } else {
+      taskList.insertBefore(draggingElement, afterElement);
+    }
+  });
+
+  boardColumnsElement.addEventListener('drop', (event) => {
+    const taskList = event.target.closest('.board-task-list');
+    if (!taskList) {
+      return;
+    }
+
+    event.preventDefault();
+  });
+
+  boardColumnsElement.addEventListener('dragend', async (event) => {
+    const cardElement = event.target.closest('.board-task');
+    if (!cardElement) {
+      return;
+    }
+
+    cardElement.classList.remove('dragging');
+
+    if (!dragStarted) {
+      return;
+    }
+
+    const result = await persistTaskOrder(boardColumnsElement, tasks, messageElement);
+
+    if (!result.success) {
+      onPersistError();
+    }
+
+    dragStarted = false;
+  });
+}
+
 function setSummary(statsElements, stagesCount, tasks) {
   const total = tasks.length;
   const done = tasks.filter((task) => task.done).length;
@@ -71,6 +233,17 @@ function setSummary(statsElements, stagesCount, tasks) {
   statsElements.pending.textContent = String(pending);
   statsElements.done.textContent = String(done);
   statsElements.stages.textContent = String(stagesCount);
+}
+
+function resolveProjectIdFromLocation() {
+  const pathMatch = window.location.pathname.match(/^\/project\/([^/]+)\/tasks\/?$/);
+
+  if (pathMatch?.[1]) {
+    return decodeURIComponent(pathMatch[1]);
+  }
+
+  const searchParams = new URLSearchParams(window.location.search);
+  return searchParams.get('id');
 }
 
 export async function renderProjectDetailsPage() {
@@ -97,11 +270,10 @@ export async function renderProjectDetailsPage() {
     return page;
   }
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const projectId = searchParams.get('id');
+  const projectId = resolveProjectIdFromLocation();
 
   if (!projectId) {
-    showMessage(messageElement, 'Missing project id. Open this page from dashboard.', 'warning');
+    showMessage(messageElement, 'Missing project id. Open this page from Projects.', 'warning');
     boardColumnsElement.innerHTML = '';
     return page;
   }
@@ -138,6 +310,9 @@ export async function renderProjectDetailsPage() {
 
   setSummary(statsElements, stages.length, tasks);
   renderColumns(boardColumnsElement, stages, tasks);
+  enableDragAndDrop(boardColumnsElement, tasks, messageElement, () => {
+    renderColumns(boardColumnsElement, stages, tasks);
+  });
   showMessage(messageElement, '');
 
   return page;
