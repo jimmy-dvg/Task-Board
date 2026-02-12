@@ -81,7 +81,7 @@ function setProjectLink(projectDetailsLink, projectId) {
     return;
   }
 
-  projectDetailsLink.href = `/projects/${projectId}`;
+  projectDetailsLink.href = `/projects/?id=${projectId}`;
   projectDetailsLink.classList.remove('disabled');
   projectDetailsLink.removeAttribute('aria-disabled');
 }

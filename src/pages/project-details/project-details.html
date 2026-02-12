@@ -1,0 +1,39 @@
+<main class="page-main py-5">
+  <section class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 id="projectTitle" class="h3 mb-0">Project</h1>
+      <a class="btn btn-outline-primary" href="/dashboard/">Back to Dashboard</a>
+    </div>
+
+    <div id="projectMessage" class="alert d-none" role="alert"></div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="summary-item">
+          <small class="text-body-secondary d-block">Tasks Total</small>
+          <strong id="projectTasksTotal">0</strong>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="summary-item">
+          <small class="text-body-secondary d-block">Tasks Pending</small>
+          <strong id="projectTasksPending">0</strong>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="summary-item">
+          <small class="text-body-secondary d-block">Tasks Done</small>
+          <strong id="projectTasksDone">0</strong>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="summary-item">
+          <small class="text-body-secondary d-block">Stages</small>
+          <strong id="projectStagesCount">0</strong>
+        </div>
+      </div>
+    </div>
+
+    <div id="projectBoardColumns" class="board-columns"></div>
+  </section>
+</main>

@@ -11,7 +11,8 @@ export default defineConfig({
         index: 'index.html',
         dashboard: 'dashboard/index.html',
         login: 'login/index.html',
-        register: 'register/index.html'
+        register: 'register/index.html',
+        projects: 'projects/index.html'
       }
     }
   }
