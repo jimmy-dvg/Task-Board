@@ -138,11 +138,31 @@ function renderColumns(boardColumnsElement, stages, tasks) {
       status.className = task.done ? 'text-success' : 'text-body-secondary';
       status.textContent = task.done ? 'Done' : 'Open';
 
+      const currentStageName = (stage.name || '').trim().toLowerCase();
+      const isInProgressState = currentStageName === 'in progress' && !task.done;
+      const isDoneState = currentStageName === 'done' && task.done;
+
       const stageActions = document.createElement('div');
       stageActions.className = 'board-task-stage-actions';
+      const inProgressButton = createStageActionButton('In Progress', 'mark-in-progress', 'btn-outline-secondary');
+      const doneButton = createStageActionButton('Done', 'mark-done', 'btn-outline-success');
+
+      inProgressButton.disabled = isInProgressState;
+      doneButton.disabled = isDoneState;
+
+      if (isInProgressState) {
+        inProgressButton.classList.remove('btn-outline-secondary');
+        inProgressButton.classList.add('btn-secondary');
+      }
+
+      if (isDoneState) {
+        doneButton.classList.remove('btn-outline-success');
+        doneButton.classList.add('btn-success');
+      }
+
       stageActions.append(
-        createStageActionButton('In Progress', 'mark-in-progress', 'btn-outline-secondary'),
-        createStageActionButton('Done', 'mark-done', 'btn-outline-success')
+        inProgressButton,
+        doneButton
       );
 
       card.append(taskHeader, description, status, stageActions);

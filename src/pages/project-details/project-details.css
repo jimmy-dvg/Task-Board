@@ -106,6 +106,10 @@
   flex: 1;
 }
 
+.board-task-stage-actions .btn:disabled {
+  opacity: 1;
+}
+
 .board-task-description p:last-child {
   margin-bottom: 0;
 }
