@@ -534,6 +534,7 @@ export async function renderProjectDetailsPage() {
   let activeTaskId = '';
   let activeStageId = '';
   let pendingDeleteTaskId = '';
+  let realtimeRefreshTimer = null;
 
   const clearTaskFormValidation = () => {
     clearFieldError(taskTitleInput, taskTitleFeedback);
@@ -543,6 +544,22 @@ export async function renderProjectDetailsPage() {
   const rerenderBoard = () => {
     setSummary(statsElements, stages.length, tasks);
     renderColumns(boardColumnsElement, stages, tasks);
+  };
+
+  const refreshTasksFromDatabase = async () => {
+    const { data: latestTasks, error } = await supabase
+      .from('tasks')
+      .select('id, stage_id, title, description_html, order_position, done')
+      .eq('project_id', projectId);
+
+    if (error) {
+      showMessage(messageElement, error.message || 'Failed to refresh tasks.', 'danger');
+      return;
+    }
+
+    tasks.length = 0;
+    tasks.push(...(latestTasks || []));
+    rerenderBoard();
   };
 
   const openAddTaskModal = (stageId) => {
@@ -784,6 +801,40 @@ export async function renderProjectDetailsPage() {
     rerenderBoard();
     showMessage(messageElement, 'Task deleted.', 'success');
   });
+
+  const realtimeChannel = supabase
+    .channel(`project-tasks-${projectId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+        filter: `project_id=eq.${projectId}`
+      },
+      () => {
+        if (realtimeRefreshTimer) {
+          return;
+        }
+
+        realtimeRefreshTimer = window.setTimeout(async () => {
+          realtimeRefreshTimer = null;
+          await refreshTasksFromDatabase();
+        }, 120);
+      }
+    )
+    .subscribe();
+
+  const cleanupRealtime = () => {
+    if (realtimeRefreshTimer) {
+      window.clearTimeout(realtimeRefreshTimer);
+      realtimeRefreshTimer = null;
+    }
+
+    supabase.removeChannel(realtimeChannel);
+  };
+
+  window.addEventListener('beforeunload', cleanupRealtime, { once: true });
 
   rerenderBoard();
   enableDragAndDrop(boardColumnsElement, tasks, messageElement, () => {
