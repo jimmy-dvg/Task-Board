@@ -12,3 +12,8 @@
   from = "/project/:id/tasks"
   to = "/project-tasks/index.html"
   status = 200
+
+[[redirects]]
+  from = "/projects/:id/users"
+  to = "/project-users/index.html"
+  status = 200

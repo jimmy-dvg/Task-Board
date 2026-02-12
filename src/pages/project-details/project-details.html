@@ -51,10 +51,12 @@
             <div class="mb-3">
               <label for="taskTitle" class="form-label">Title</label>
               <input id="taskTitle" name="taskTitle" type="text" class="form-control" maxlength="180" required />
+              <div id="taskTitleFeedback" class="invalid-feedback"></div>
             </div>
             <div class="mb-3">
               <label for="taskDescription" class="form-label">Description</label>
               <textarea id="taskDescription" name="taskDescription" class="form-control" rows="4"></textarea>
+              <div id="taskDescriptionFeedback" class="invalid-feedback"></div>
             </div>
             <div class="form-check">
               <input id="taskDone" name="taskDone" type="checkbox" class="form-check-input" />

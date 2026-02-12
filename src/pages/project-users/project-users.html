@@ -1,0 +1,81 @@
+<main class="page-main py-5">
+  <section class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h3 mb-0">Project Members</h1>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary" href="/projects/">Back to Projects</a>
+        <button id="openAddUserModal" type="button" class="btn btn-primary">Add User</button>
+      </div>
+    </div>
+
+    <p id="projectUsersProjectName" class="text-body-secondary mb-2"></p>
+    <div id="projectUsersMessage" class="alert d-none" role="alert"></div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Email</th>
+            <th scope="col">Assigned At</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="projectUsersTableBody">
+          <tr>
+            <td colspan="3" class="text-body-secondary">Loading project members...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="addUserModalLabel" class="modal-title fs-5">Add user to project</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="userSearchInput" class="form-label">Search users</label>
+            <input id="userSearchInput" type="search" class="form-control" placeholder="Search by email" />
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Email</th>
+                  <th scope="col" class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody id="allUsersTableBody">
+                <tr>
+                  <td colspan="2" class="text-body-secondary">Loading users...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="removeUserModal" tabindex="-1" aria-labelledby="removeUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="removeUserModalLabel" class="modal-title fs-5">Remove user</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to remove <strong id="removeUserName"></strong> from this project?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="confirmRemoveUser" type="button" class="btn btn-danger">Remove</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>

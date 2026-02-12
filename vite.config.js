@@ -16,6 +16,10 @@ export default defineConfig({
             req.url = '/project-tasks/';
           }
 
+          if (/^\/projects\/[^/]+\/users\/?$/.test(requestUrl)) {
+            req.url = '/project-users/';
+          }
+
           next();
         });
       }
@@ -34,7 +38,8 @@ export default defineConfig({
         register: 'register/index.html',
         projects: 'projects/index.html',
         project: 'project/index.html',
-        projectTasks: 'project-tasks/index.html'
+        projectTasks: 'project-tasks/index.html',
+        projectUsers: 'project-users/index.html'
       }
     }
   }

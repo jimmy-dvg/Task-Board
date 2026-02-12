@@ -33,6 +33,16 @@ function htmlToPlainText(html) {
   return temp.textContent || '';
 }
 
+function clearFieldError(inputElement, feedbackElement) {
+  inputElement.classList.remove('is-invalid');
+  feedbackElement.textContent = '';
+}
+
+function setFieldError(inputElement, feedbackElement, message) {
+  inputElement.classList.add('is-invalid');
+  feedbackElement.textContent = message;
+}
+
 function ensureEmptyStates(boardColumnsElement) {
   boardColumnsElement.querySelectorAll('.board-task-list').forEach((taskList) => {
     const cards = taskList.querySelectorAll('.board-task');
@@ -219,7 +229,32 @@ async function persistTaskOrder(boardColumnsElement, tasks, messageElement) {
 
   showMessage(messageElement, 'Saving task positions...', 'secondary');
 
-  const updateResults = await Promise.all(
+  const temporaryBase = 2000000000;
+  const temporaryUpdates = updates.map((updateItem, index) => ({
+    id: updateItem.id,
+    stage_id: updateItem.stage_id,
+    order_position: temporaryBase - index
+  }));
+
+  const temporaryResults = await Promise.all(
+    temporaryUpdates.map((updateItem) =>
+      supabase
+        .from('tasks')
+        .update({
+          stage_id: updateItem.stage_id,
+          order_position: updateItem.order_position
+        })
+        .eq('id', updateItem.id)
+    )
+  );
+
+  const temporaryFailure = temporaryResults.find((result) => result.error);
+  if (temporaryFailure?.error) {
+    showMessage(messageElement, temporaryFailure.error.message || 'Failed to save task positions.', 'danger');
+    return { success: false };
+  }
+
+  const finalResults = await Promise.all(
     updates.map((updateItem) =>
       supabase
         .from('tasks')
@@ -231,9 +266,9 @@ async function persistTaskOrder(boardColumnsElement, tasks, messageElement) {
     )
   );
 
-  const failedUpdate = updateResults.find((result) => result.error);
-  if (failedUpdate?.error) {
-    showMessage(messageElement, failedUpdate.error.message || 'Failed to save task positions.', 'danger');
+  const finalFailure = finalResults.find((result) => result.error);
+  if (finalFailure?.error) {
+    showMessage(messageElement, finalFailure.error.message || 'Failed to save task positions.', 'danger');
     return { success: false };
   }
 
@@ -465,6 +500,8 @@ export async function renderProjectDetailsPage() {
   const taskFormElement = page.querySelector('#taskForm');
   const taskTitleInput = page.querySelector('#taskTitle');
   const taskDescriptionInput = page.querySelector('#taskDescription');
+  const taskTitleFeedback = page.querySelector('#taskTitleFeedback');
+  const taskDescriptionFeedback = page.querySelector('#taskDescriptionFeedback');
   const taskDoneInput = page.querySelector('#taskDone');
   const taskFormSubmitButton = page.querySelector('#taskFormSubmit');
   const confirmTaskDeleteButton = page.querySelector('#confirmTaskDelete');
@@ -530,6 +567,11 @@ export async function renderProjectDetailsPage() {
   let activeStageId = '';
   let pendingDeleteTaskId = '';
 
+  const clearTaskFormValidation = () => {
+    clearFieldError(taskTitleInput, taskTitleFeedback);
+    clearFieldError(taskDescriptionInput, taskDescriptionFeedback);
+  };
+
   const rerenderBoard = () => {
     setSummary(statsElements, stages.length, tasks);
     renderColumns(boardColumnsElement, stages, tasks);
@@ -542,6 +584,7 @@ export async function renderProjectDetailsPage() {
     taskModalLabelElement.textContent = 'Add Task';
     taskFormSubmitButton.textContent = 'Create';
     taskFormElement.reset();
+    clearTaskFormValidation();
     taskDoneInput.checked = false;
     taskModal.show();
     taskTitleInput.focus();
@@ -553,6 +596,7 @@ export async function renderProjectDetailsPage() {
     activeStageId = task.stage_id;
     taskModalLabelElement.textContent = 'Edit Task';
     taskFormSubmitButton.textContent = 'Update';
+    clearTaskFormValidation();
     taskTitleInput.value = task.title || '';
     taskDescriptionInput.value = htmlToPlainText(task.description_html || '');
     taskDoneInput.checked = Boolean(task.done);
@@ -602,15 +646,33 @@ export async function renderProjectDetailsPage() {
     }
   });
 
+  taskTitleInput.addEventListener('input', () => {
+    if (taskTitleInput.classList.contains('is-invalid') && taskTitleInput.value.trim()) {
+      clearFieldError(taskTitleInput, taskTitleFeedback);
+    }
+  });
+
+  taskDescriptionInput.addEventListener('input', () => {
+    if (taskDescriptionInput.classList.contains('is-invalid')) {
+      clearFieldError(taskDescriptionInput, taskDescriptionFeedback);
+    }
+  });
+
+  taskModalElement.addEventListener('hidden.bs.modal', () => {
+    clearTaskFormValidation();
+  });
+
   taskFormElement.addEventListener('submit', async (event) => {
     event.preventDefault();
+    clearTaskFormValidation();
 
     const title = taskTitleInput.value.trim();
     const descriptionHtml = plainTextToHtml(taskDescriptionInput.value.trim());
     const done = Boolean(taskDoneInput.checked);
 
     if (!title) {
-      showMessage(messageElement, 'Task title is required.', 'warning');
+      setFieldError(taskTitleInput, taskTitleFeedback, 'Title is required.');
+      taskTitleInput.focus();
       return;
     }
 

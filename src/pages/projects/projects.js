@@ -69,6 +69,17 @@ export async function renderProjectsPage() {
       const row = document.createElement('tr');
       const stats = buildStats(tasksByProject.get(project.id), stagesByProject.get(project.id));
       const safeName = escapeHtml(project.name);
+      const isOwner = project.owner_id === session.user.id;
+
+      const ownerActions = isOwner
+        ? `
+            <a class="btn btn-sm btn-outline-primary" href="/project/${project.id}/edit">Edit</a>
+            <a class="btn btn-sm btn-outline-info" href="/projects/${project.id}/users">Users</a>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-project-id="${project.id}" data-project-name="${safeName}">
+              Delete
+            </button>
+          `
+        : '';
 
       row.innerHTML = `
         <td class="project-title">${safeName}</td>
@@ -77,11 +88,8 @@ export async function renderProjectsPage() {
         <td>${stats.stagesCount}</td>
         <td class="text-end">
           <div class="actions-group">
-            <a class="btn btn-sm btn-outline-primary" href="/project/${project.id}/edit">Edit</a>
             <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/tasks">View Tasks</a>
-            <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-project-id="${project.id}" data-project-name="${safeName}">
-              Delete
-            </button>
+            ${ownerActions}
           </div>
         </td>
       `;
@@ -95,7 +103,7 @@ export async function renderProjectsPage() {
 
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
-      .select('id, name')
+      .select('id, name, owner_id')
       .order('created_at', { ascending: true });
 
     if (projectsError) {
