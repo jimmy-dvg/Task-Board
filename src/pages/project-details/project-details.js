@@ -3,6 +3,8 @@ import './project-details.css';
 import { Modal } from 'bootstrap';
 import { supabase } from '../../lib/supabase-client.js';
 
+const TASK_ATTACHMENTS_BUCKET = 'task-attachments';
+
 function showMessage(messageElement, message, variant = 'secondary') {
   if (!message) {
     messageElement.className = 'alert d-none';
@@ -12,6 +14,21 @@ function showMessage(messageElement, message, variant = 'secondary') {
 
   messageElement.className = `alert alert-${variant}`;
   messageElement.textContent = message;
+}
+
+function sanitizeFileName(fileName) {
+  return String(fileName || 'file').replaceAll(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const sizeIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** sizeIndex;
+  return `${value.toFixed(sizeIndex === 0 ? 0 : 1)} ${units[sizeIndex]}`;
 }
 
 function escapeHtml(value) {
@@ -83,7 +100,7 @@ function createStageActionButton(label, action, buttonClass = 'btn-outline-secon
   return button;
 }
 
-function renderColumns(boardColumnsElement, stages, tasks) {
+function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) {
   boardColumnsElement.innerHTML = '';
 
   stages.forEach((stage) => {
@@ -138,6 +155,27 @@ function renderColumns(boardColumnsElement, stages, tasks) {
       status.className = task.done ? 'text-success' : 'text-body-secondary';
       status.textContent = task.done ? 'Done' : 'Open';
 
+      const taskFiles = document.createElement('div');
+      taskFiles.className = 'board-task-files';
+
+      const taskAttachments = attachmentsByTaskId.get(task.id) || [];
+      if (taskAttachments.length) {
+        const filesLabel = document.createElement('small');
+        filesLabel.className = 'text-body-secondary';
+        filesLabel.textContent = `Files (${taskAttachments.length})`;
+        taskFiles.append(filesLabel);
+
+        taskAttachments.slice(0, 3).forEach((attachment) => {
+          const fileLink = document.createElement('a');
+          fileLink.className = 'board-task-file-link';
+          fileLink.href = attachment.signed_url;
+          fileLink.target = '_blank';
+          fileLink.rel = 'noopener noreferrer';
+          fileLink.textContent = attachment.file_name;
+          taskFiles.append(fileLink);
+        });
+      }
+
       const currentStageName = (stage.name || '').trim().toLowerCase();
       const isInProgressState = currentStageName === 'in progress' && !task.done;
       const isDoneState = currentStageName === 'done' && task.done;
@@ -165,7 +203,7 @@ function renderColumns(boardColumnsElement, stages, tasks) {
         doneButton
       );
 
-      card.append(taskHeader, description, status, stageActions);
+      card.append(taskHeader, description, status, taskFiles, stageActions);
       taskList.append(card);
     });
 
@@ -470,6 +508,8 @@ export async function renderProjectDetailsPage() {
   const taskDescriptionInput = page.querySelector('#taskDescription');
   const taskTitleFeedback = page.querySelector('#taskTitleFeedback');
   const taskDescriptionFeedback = page.querySelector('#taskDescriptionFeedback');
+  const taskAttachmentsInput = page.querySelector('#taskAttachmentsInput');
+  const taskAttachmentsList = page.querySelector('#taskAttachmentsList');
   const taskDoneInput = page.querySelector('#taskDone');
   const taskFormSubmitButton = page.querySelector('#taskFormSubmit');
   const confirmTaskDeleteButton = page.querySelector('#confirmTaskDelete');
@@ -530,10 +570,12 @@ export async function renderProjectDetailsPage() {
 
   const stages = await ensureProjectStages(projectId, stagesResult.data || [], messageElement);
   const tasks = tasksResult.data || [];
+  let attachmentsByTaskId = new Map();
   let taskFormMode = 'add';
   let activeTaskId = '';
   let activeStageId = '';
   let pendingDeleteTaskId = '';
+  let activeTaskAttachments = [];
   let realtimeRefreshTimer = null;
 
   const clearTaskFormValidation = () => {
@@ -541,9 +583,164 @@ export async function renderProjectDetailsPage() {
     clearFieldError(taskDescriptionInput, taskDescriptionFeedback);
   };
 
+  const renderTaskAttachmentsList = () => {
+    if (!activeTaskAttachments.length) {
+      taskAttachmentsList.innerHTML = '<small class="text-body-secondary">No attachments yet.</small>';
+      return;
+    }
+
+    taskAttachmentsList.innerHTML = activeTaskAttachments
+      .map(
+        (attachment) => `
+          <div class="task-attachment-item">
+            <div>
+              <a href="${attachment.signed_url}" target="_blank" rel="noopener noreferrer" class="task-attachment-name">${escapeHtml(attachment.file_name || 'Attachment')}</a>
+              <div><small class="text-body-secondary">${formatFileSize(attachment.file_size)}</small></div>
+            </div>
+            <div class="task-attachment-actions">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger"
+                data-action="remove-attachment"
+                data-attachment-id="${attachment.id}"
+                data-attachment-path="${escapeHtml(attachment.file_path)}"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        `
+      )
+      .join('');
+  };
+
+  const loadTaskAttachments = async (taskId) => {
+    const { data: rows, error } = await supabase
+      .from('task_attachments')
+      .select('id, file_name, file_path, file_size')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      showMessage(messageElement, error.message || 'Failed to load attachments.', 'danger');
+      activeTaskAttachments = [];
+      renderTaskAttachmentsList();
+      return;
+    }
+
+    const attachments = rows || [];
+    const signedUrlResults = await Promise.all(
+      attachments.map((attachment) =>
+        supabase.storage.from(TASK_ATTACHMENTS_BUCKET).createSignedUrl(attachment.file_path, 3600)
+      )
+    );
+
+    activeTaskAttachments = attachments
+      .map((attachment, index) => ({
+        ...attachment,
+        signed_url: signedUrlResults[index]?.data?.signedUrl || '#'
+      }))
+      .filter((attachment) => attachment.signed_url && attachment.signed_url !== '#');
+
+    renderTaskAttachmentsList();
+  };
+
+  const uploadSelectedAttachments = async (taskId) => {
+    const selectedFiles = [...(taskAttachmentsInput.files || [])];
+
+    if (!selectedFiles.length) {
+      return { success: true };
+    }
+
+    for (const file of selectedFiles) {
+      const safeName = sanitizeFileName(file.name);
+      const filePath = `${taskId}/${crypto.randomUUID()}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(TASK_ATTACHMENTS_BUCKET)
+        .upload(filePath, file, {
+          upsert: false,
+          contentType: file.type || 'application/octet-stream'
+        });
+
+      if (uploadError) {
+        showMessage(messageElement, uploadError.message || 'Failed to upload attachment.', 'danger');
+        return { success: false };
+      }
+
+      const { error: insertError } = await supabase.from('task_attachments').insert({
+        task_id: taskId,
+        file_name: file.name,
+        file_path: filePath,
+        mime_type: file.type || null,
+        file_size: file.size,
+        created_by: session.user.id
+      });
+
+      if (insertError) {
+        showMessage(messageElement, insertError.message || 'Failed to save attachment metadata.', 'danger');
+        return { success: false };
+      }
+    }
+
+    taskAttachmentsInput.value = '';
+    return { success: true };
+  };
+
   const rerenderBoard = () => {
     setSummary(statsElements, stages.length, tasks);
-    renderColumns(boardColumnsElement, stages, tasks);
+    renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId);
+  };
+
+  const refreshAttachmentsForCurrentTasks = async () => {
+    const taskIds = tasks.map((task) => task.id);
+
+    if (!taskIds.length) {
+      attachmentsByTaskId = new Map();
+      rerenderBoard();
+      return;
+    }
+
+    const { data: rows, error } = await supabase
+      .from('task_attachments')
+      .select('id, task_id, file_name, file_path')
+      .in('task_id', taskIds)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      showMessage(messageElement, error.message || 'Failed to refresh attachments.', 'danger');
+      return;
+    }
+
+    const rawAttachments = rows || [];
+    const signedUrlResults = await Promise.all(
+      rawAttachments.map((attachment) =>
+        supabase.storage.from(TASK_ATTACHMENTS_BUCKET).createSignedUrl(attachment.file_path, 3600)
+      )
+    );
+
+    const mappedAttachments = new Map();
+
+    rawAttachments.forEach((attachment, index) => {
+      const signedUrl = signedUrlResults[index]?.data?.signedUrl;
+      if (!signedUrl) {
+        return;
+      }
+
+      if (!mappedAttachments.has(attachment.task_id)) {
+        mappedAttachments.set(attachment.task_id, []);
+      }
+
+      mappedAttachments.get(attachment.task_id).push({
+        id: attachment.id,
+        file_name: attachment.file_name,
+        file_path: attachment.file_path,
+        signed_url: signedUrl
+      });
+    });
+
+    attachmentsByTaskId = mappedAttachments;
+    rerenderBoard();
   };
 
   const refreshTasksFromDatabase = async () => {
@@ -559,23 +756,26 @@ export async function renderProjectDetailsPage() {
 
     tasks.length = 0;
     tasks.push(...(latestTasks || []));
-    rerenderBoard();
+    await refreshAttachmentsForCurrentTasks();
   };
 
   const openAddTaskModal = (stageId) => {
     taskFormMode = 'add';
     activeTaskId = '';
     activeStageId = stageId;
+    activeTaskAttachments = [];
     taskModalLabelElement.textContent = 'Add Task';
     taskFormSubmitButton.textContent = 'Create';
     taskFormElement.reset();
     clearTaskFormValidation();
     taskDoneInput.checked = false;
+    taskAttachmentsInput.value = '';
+    renderTaskAttachmentsList();
     taskModal.show();
     taskTitleInput.focus();
   };
 
-  const openEditTaskModal = (task) => {
+  const openEditTaskModal = async (task) => {
     taskFormMode = 'edit';
     activeTaskId = task.id;
     activeStageId = task.stage_id;
@@ -585,9 +785,15 @@ export async function renderProjectDetailsPage() {
     taskTitleInput.value = task.title || '';
     taskDescriptionInput.value = htmlToPlainText(task.description_html || '');
     taskDoneInput.checked = Boolean(task.done);
+    taskAttachmentsInput.value = '';
+    activeTaskAttachments = [];
+    renderTaskAttachmentsList();
     taskModal.show();
     taskTitleInput.focus();
+    await loadTaskAttachments(task.id);
   };
+
+  renderTaskAttachmentsList();
 
   boardColumnsElement.addEventListener('click', (event) => {
     const actionElement = event.target.closest('[data-action]');
@@ -677,6 +883,54 @@ export async function renderProjectDetailsPage() {
         showMessage(messageElement, '');
       })();
     }
+
+  });
+
+  taskAttachmentsList.addEventListener('click', (event) => {
+    const removeButton = event.target.closest('[data-action="remove-attachment"]');
+    if (!removeButton) {
+      return;
+    }
+
+    (async () => {
+      const attachmentId = removeButton.getAttribute('data-attachment-id');
+      const attachmentPath = removeButton.getAttribute('data-attachment-path');
+
+      if (!attachmentId || !attachmentPath) {
+        return;
+      }
+
+      removeButton.disabled = true;
+      showMessage(messageElement, 'Removing attachment...', 'secondary');
+
+      const { error: storageError } = await supabase.storage.from(TASK_ATTACHMENTS_BUCKET).remove([attachmentPath]);
+      if (storageError) {
+        showMessage(messageElement, storageError.message || 'Failed to remove attachment file.', 'danger');
+        removeButton.disabled = false;
+        return;
+      }
+
+      const { error: rowError } = await supabase.from('task_attachments').delete().eq('id', attachmentId);
+      if (rowError) {
+        showMessage(messageElement, rowError.message || 'Failed to remove attachment metadata.', 'danger');
+        removeButton.disabled = false;
+        return;
+      }
+
+      activeTaskAttachments = activeTaskAttachments.filter((attachment) => attachment.id !== attachmentId);
+      attachmentsByTaskId.set(
+        activeTaskId,
+        activeTaskAttachments.map((attachment) => ({
+          id: attachment.id,
+          file_name: attachment.file_name,
+          file_path: attachment.file_path,
+          signed_url: attachment.signed_url
+        }))
+      );
+      renderTaskAttachmentsList();
+      rerenderBoard();
+      showMessage(messageElement, 'Attachment removed.', 'success');
+    })();
   });
 
   taskTitleInput.addEventListener('input', () => {
@@ -735,7 +989,14 @@ export async function renderProjectDetailsPage() {
         return;
       }
 
+      const uploadResult = await uploadSelectedAttachments(insertedTask.id);
+      if (!uploadResult.success) {
+        taskFormSubmitButton.disabled = false;
+        return;
+      }
+
       tasks.push(insertedTask);
+      await refreshAttachmentsForCurrentTasks();
       taskModal.hide();
       rerenderBoard();
       showMessage(messageElement, 'Task created.', 'success');
@@ -762,6 +1023,12 @@ export async function renderProjectDetailsPage() {
       return;
     }
 
+    const uploadResult = await uploadSelectedAttachments(activeTaskId);
+    if (!uploadResult.success) {
+      taskFormSubmitButton.disabled = false;
+      return;
+    }
+
     const existingTask = tasks.find((item) => item.id === activeTaskId);
     if (existingTask) {
       existingTask.title = updatedTask.title;
@@ -769,6 +1036,7 @@ export async function renderProjectDetailsPage() {
       existingTask.done = updatedTask.done;
     }
 
+    await refreshAttachmentsForCurrentTasks();
     taskModal.hide();
     rerenderBoard();
     showMessage(messageElement, 'Task updated.', 'success');
@@ -793,6 +1061,7 @@ export async function renderProjectDetailsPage() {
 
     const taskIndex = tasks.findIndex((item) => item.id === pendingDeleteTaskId);
     if (taskIndex >= 0) {
+      attachmentsByTaskId.delete(tasks[taskIndex].id);
       tasks.splice(taskIndex, 1);
     }
 
@@ -837,6 +1106,7 @@ export async function renderProjectDetailsPage() {
   window.addEventListener('beforeunload', cleanupRealtime, { once: true });
 
   rerenderBoard();
+  await refreshAttachmentsForCurrentTasks();
   enableDragAndDrop(boardColumnsElement, tasks, messageElement, () => {
     rerenderBoard();
   });

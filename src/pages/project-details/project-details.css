@@ -114,7 +114,46 @@
   margin-bottom: 0;
 }
 
+.board-task-files {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.board-task-file-link {
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .board-empty {
   padding: 0.5rem;
   color: var(--bs-secondary-color);
+}
+
+.task-attachments-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.task-attachment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.task-attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-attachment-actions {
+  display: inline-flex;
+  gap: 0.4rem;
 }

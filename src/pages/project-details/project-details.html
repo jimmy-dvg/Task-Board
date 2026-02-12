@@ -62,6 +62,23 @@
               <input id="taskDone" name="taskDone" type="checkbox" class="form-check-input" />
               <label for="taskDone" class="form-check-label">Done</label>
             </div>
+
+            <hr class="my-3" />
+
+            <div class="mb-2">
+              <label for="taskAttachmentsInput" class="form-label">Attachments</label>
+              <input
+                id="taskAttachmentsInput"
+                name="taskAttachmentsInput"
+                type="file"
+                class="form-control"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+              />
+              <small class="text-body-secondary">You can upload screenshots and documents.</small>
+            </div>
+
+            <div id="taskAttachmentsList" class="task-attachments-list"></div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
