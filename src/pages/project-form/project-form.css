@@ -1,3 +1,39 @@
 .project-form-wrap {
   max-width: 760px;
 }
+
+.project-template-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.project-template-stage {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--bs-tertiary-bg);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.project-users-list {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--bs-body-bg);
+}
+
+.project-user-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.project-user-item:last-child {
+  border-bottom: 0;
+}

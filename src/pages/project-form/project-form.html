@@ -19,6 +19,44 @@
           placeholder="Project name"
           required
         />
+        <div id="projectNameFeedback" class="invalid-feedback"></div>
+      </div>
+
+      <div class="mb-3">
+        <label for="projectDescription" class="form-label">Project Description</label>
+        <textarea
+          id="projectDescription"
+          name="projectDescription"
+          class="form-control"
+          rows="4"
+          maxlength="2000"
+          placeholder="Describe the goal and scope of this project"
+        ></textarea>
+      </div>
+
+      <div id="projectTemplateSection" class="mb-3">
+        <label for="projectTemplate" class="form-label">Board Template</label>
+        <select id="projectTemplate" name="projectTemplate" class="form-select">
+          <option value="basic">Basic (Not Started / In Progress / Done)</option>
+          <option value="kanban">Kanban (Backlog / Selected / In Progress / Review / Done)</option>
+          <option value="bug-tracking">Bug Tracking (Reported / Triaged / In Progress / QA / Done)</option>
+          <option value="content">Content (Ideas / Draft / Editing / Scheduled / Published)</option>
+        </select>
+        <small class="text-body-secondary d-block mt-2">Stages preview:</small>
+        <div id="projectTemplatePreview" class="project-template-preview"></div>
+      </div>
+
+      <div id="projectAssignSection" class="mb-3">
+        <label for="projectUserSearch" class="form-label">Assign Users (optional)</label>
+        <input
+          id="projectUserSearch"
+          name="projectUserSearch"
+          type="search"
+          class="form-control mb-2"
+          placeholder="Search users by email"
+        />
+        <div id="projectUsersList" class="project-users-list" role="group" aria-label="Project users"></div>
+        <small class="text-body-secondary d-block mt-2">Selected users: <span id="projectSelectedUsersCount">0</span></small>
       </div>
 
       <div class="d-flex gap-2 justify-content-end">
