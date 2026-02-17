@@ -37,6 +37,11 @@
           </div>
         </div>
 
+        <div class="mb-3">
+          <label for="projectSearchInput" class="form-label mb-1">Search projects</label>
+          <input id="projectSearchInput" type="search" class="form-control" placeholder="Search by project name or description" />
+        </div>
+
         <div id="projectCards" class="project-cards" aria-label="Projects"></div>
 
         <div class="mt-2">
@@ -49,4 +54,77 @@
 
     <div id="boardColumns" class="board-columns"></div>
   </section>
+
+  <div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+      <form id="projectModalForm" class="modal-content project-modal-content">
+        <div class="modal-header">
+          <h2 id="projectModalLabel" class="modal-title fs-5">Create project</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body project-modal-body">
+          <input id="projectModalId" type="hidden" />
+          <div class="mb-3">
+            <label for="projectModalName" class="form-label">Project name</label>
+            <input id="projectModalName" name="name" class="form-control" maxlength="120" required />
+            <div id="projectModalNameFeedback" class="invalid-feedback"></div>
+          </div>
+          <div class="mb-3">
+            <label for="projectModalDescription" class="form-label">Description</label>
+            <textarea
+              id="projectModalDescription"
+              name="description"
+              class="form-control"
+              rows="4"
+              maxlength="2000"
+              placeholder="Short description of project goals and scope"
+            ></textarea>
+          </div>
+
+          <div id="projectTemplateSection" class="mb-3">
+            <label for="projectTemplate" class="form-label">Board Template</label>
+            <select id="projectTemplate" class="form-select">
+              <option value="basic">Basic (Not Started / In Progress / Done)</option>
+              <option value="kanban">Kanban (Backlog / Selected / In Progress / Review / Done)</option>
+              <option value="bug-tracking">Bug Tracking (Reported / Triaged / In Progress / QA / Done)</option>
+              <option value="content">Content (Ideas / Draft / Editing / Scheduled / Published)</option>
+            </select>
+            <div id="projectTemplateReadonlyHint" class="small text-body-secondary mt-1 d-none">Template is read-only in edit mode.</div>
+            <div class="small text-body-secondary mt-2">Stages preview:</div>
+            <div id="projectTemplatePreview" class="project-template-preview"></div>
+          </div>
+
+          <div id="projectAssignSection" class="mb-1">
+            <label for="projectUserSearch" class="form-label">Assign Users (optional)</label>
+            <input id="projectUserSearch" type="search" class="form-control mb-2" placeholder="Search users by email" />
+            <div id="projectUsersList" class="project-users-list"></div>
+            <div class="small text-body-secondary mt-2">Selected users: <span id="projectSelectedUsersCount">0</span></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="projectModalSubmitAndTasks" type="submit" data-after-submit="tasks" class="btn btn-outline-primary">Create &amp; Add Tasks</button>
+          <button id="projectModalSubmit" type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="deleteProjectModalLabel" class="modal-title fs-5">Delete project</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Are you sure you want to delete <strong id="deleteProjectName"></strong>? This cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button id="confirmDeleteProject" type="button" class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </main>

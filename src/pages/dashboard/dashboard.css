@@ -23,13 +23,160 @@
   border: 1px solid var(--bs-border-color);
   border-radius: 0.5rem;
   background: var(--bs-body-bg);
-  text-align: left;
-  padding: 0.6rem 0.75rem;
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .project-card.active {
   border-color: var(--bs-primary);
   background: var(--bs-primary-bg-subtle);
+}
+
+.project-card:hover,
+.project-card:focus-within {
+  border-color: var(--bs-primary);
+  background: var(--bs-primary-bg-subtle);
+}
+
+.project-card-select {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+}
+
+.project-card-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-card-description {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--bs-secondary-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-card-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.project-card-badges .badge {
+  font-weight: 500;
+}
+
+#projectModal .modal-dialog {
+  max-width: 820px;
+}
+
+.project-modal-content {
+  border-radius: 0.75rem;
+}
+
+#projectModal .modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--bs-body-bg);
+  z-index: 2;
+}
+
+.project-modal-body {
+  padding: 1.25rem 1.5rem;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.project-modal-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.project-modal-body::-webkit-scrollbar-thumb {
+  background: var(--bs-secondary-bg);
+  border-radius: 999px;
+}
+
+.project-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-template-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.project-template-stage {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--bs-tertiary-bg);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.project-users-list {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--bs-body-bg);
+}
+
+.project-user-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.project-user-item:last-child {
+  border-bottom: 0;
+}
+
+.project-card-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.project-card:hover .project-card-actions,
+.project-card:focus-within .project-card-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.project-card-create {
+  border-style: dashed;
+}
+
+.project-create-button {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  color: var(--bs-primary-text-emphasis);
+  font-weight: 600;
 }
 
 .board-columns {

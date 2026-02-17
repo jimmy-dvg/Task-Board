@@ -9,6 +9,12 @@
   white-space: normal;
 }
 
+.project-description {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
 .actions-group {
   display: inline-flex;
   gap: 0.5rem;

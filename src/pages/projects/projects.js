@@ -23,6 +23,16 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function truncateText(value, maxLength = 120) {
+  const text = String(value || '').trim();
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength - 1)}…`;
+}
+
 function buildStats(tasks = [], stages = []) {
   const openTasks = tasks.filter((task) => !task.done).length;
   const doneTasks = tasks.filter((task) => task.done).length;
@@ -69,6 +79,7 @@ export async function renderProjectsPage() {
       const row = document.createElement('tr');
       const stats = buildStats(tasksByProject.get(project.id), stagesByProject.get(project.id));
       const safeName = escapeHtml(project.name);
+      const safeDescription = escapeHtml(truncateText(project.description));
       const isOwner = project.owner_id === session.user.id;
 
       const ownerActions = isOwner
@@ -84,6 +95,7 @@ export async function renderProjectsPage() {
       row.innerHTML = `
         <td class="project-title">
           <a class="link-body-emphasis text-decoration-none" href="/project/${project.id}/tasks">${safeName}</a>
+          ${safeDescription ? `<div class="project-description text-body-secondary">${safeDescription}</div>` : ''}
         </td>
         <td>${stats.openTasks}</td>
         <td>${stats.doneTasks}</td>
@@ -106,7 +118,7 @@ export async function renderProjectsPage() {
 
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
-      .select('id, name, owner_id')
+      .select('id, name, description, owner_id')
       .order('created_at', { ascending: true });
 
     if (projectsError) {
