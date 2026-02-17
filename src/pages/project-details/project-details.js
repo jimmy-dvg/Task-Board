@@ -78,14 +78,17 @@ function ensureEmptyStates(boardColumnsElement) {
   });
 }
 
-function createCardActionButton(label, action, icon, buttonClass = 'btn-outline-secondary') {
+function createCardActionButton(label, action, iconClass, buttonClass = 'btn-outline-secondary') {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = `btn btn-sm ${buttonClass}`;
+  button.className = `btn btn-sm board-task-action ${buttonClass}`;
   button.setAttribute('data-action', action);
   button.setAttribute('aria-label', label);
   button.setAttribute('title', label);
-  button.textContent = icon;
+  const icon = document.createElement('i');
+  icon.className = iconClass;
+  icon.setAttribute('aria-hidden', 'true');
+  button.append(icon);
   return button;
 }
 
@@ -109,7 +112,21 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) 
 
     const header = document.createElement('div');
     header.className = 'board-column-header';
-    header.textContent = stage.name;
+
+    const headerTitle = document.createElement('span');
+    headerTitle.textContent = stage.name;
+
+    const addTaskButton = document.createElement('button');
+    addTaskButton.type = 'button';
+    addTaskButton.className = 'btn btn-outline-primary board-add-task';
+    addTaskButton.setAttribute('data-action', 'add-task');
+    addTaskButton.setAttribute('data-stage-id', stage.id);
+    addTaskButton.setAttribute('data-tooltip', 'Create new task');
+    addTaskButton.setAttribute('aria-label', `Create new task in ${stage.name}`);
+    addTaskButton.setAttribute('title', `Create new task in ${stage.name}`);
+    addTaskButton.textContent = '+';
+
+    header.append(headerTitle, addTaskButton);
 
     const taskList = document.createElement('div');
     taskList.className = 'board-task-list';
@@ -141,8 +158,8 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) 
       const taskActions = document.createElement('div');
       taskActions.className = 'board-task-actions';
       taskActions.append(
-        createCardActionButton('Edit task', 'edit-task', '✎'),
-        createCardActionButton('Delete task', 'delete-task', '🗑', 'btn-outline-danger')
+        createCardActionButton('Edit task', 'edit-task', 'bi bi-pencil'),
+        createCardActionButton('Delete task', 'delete-task', 'bi bi-trash', 'btn-outline-danger')
       );
 
       taskHeader.append(title, taskActions);
@@ -207,21 +224,7 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) 
       taskList.append(card);
     });
 
-    const columnFooter = document.createElement('div');
-    columnFooter.className = 'board-column-footer';
-
-    const addTaskButton = document.createElement('button');
-    addTaskButton.type = 'button';
-    addTaskButton.className = 'btn btn-outline-primary board-add-task';
-    addTaskButton.setAttribute('data-action', 'add-task');
-    addTaskButton.setAttribute('data-stage-id', stage.id);
-    addTaskButton.setAttribute('aria-label', `Add task to ${stage.name}`);
-    addTaskButton.setAttribute('title', `Add task to ${stage.name}`);
-    addTaskButton.textContent = '+';
-
-    columnFooter.append(addTaskButton);
     column.append(header, taskList);
-    column.append(columnFooter);
     boardColumnsElement.append(column);
   });
 
@@ -799,6 +802,24 @@ export async function renderProjectDetailsPage() {
     const actionElement = event.target.closest('[data-action]');
 
     if (!actionElement) {
+      const taskCard = event.target.closest('.board-task');
+
+      if (!taskCard) {
+        return;
+      }
+
+      if (event.target.closest('a, button, input, textarea, select, label')) {
+        return;
+      }
+
+      const taskId = taskCard.getAttribute('data-task-id');
+      const task = tasks.find((item) => item.id === taskId);
+
+      if (!task) {
+        return;
+      }
+
+      openEditTaskModal(task);
       return;
     }
 
