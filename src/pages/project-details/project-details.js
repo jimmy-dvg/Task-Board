@@ -2,6 +2,7 @@ import template from './project-details.html?raw';
 import './project-details.css';
 import { Modal } from 'bootstrap';
 import { supabase } from '../../lib/supabase-client.js';
+import { createTaskEditorController } from '../../components/task-editor/task-editor.js';
 
 const TASK_ATTACHMENTS_BUCKET = 'task-attachments';
 
@@ -18,17 +19,6 @@ function showMessage(messageElement, message, variant = 'secondary') {
 
 function sanitizeFileName(fileName) {
   return String(fileName || 'file').replaceAll(/[^a-zA-Z0-9._-]/g, '_');
-}
-
-function formatFileSize(bytes) {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return '0 B';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const sizeIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** sizeIndex;
-  return `${value.toFixed(sizeIndex === 0 ? 0 : 1)} ${units[sizeIndex]}`;
 }
 
 function escapeHtml(value) {
@@ -48,16 +38,6 @@ function htmlToPlainText(html) {
   const temp = document.createElement('div');
   temp.innerHTML = html || '';
   return temp.textContent || '';
-}
-
-function clearFieldError(inputElement, feedbackElement) {
-  inputElement.classList.remove('is-invalid');
-  feedbackElement.textContent = '';
-}
-
-function setFieldError(inputElement, feedbackElement, message) {
-  inputElement.classList.add('is-invalid');
-  feedbackElement.textContent = message;
 }
 
 function ensureEmptyStates(boardColumnsElement) {
@@ -503,18 +483,7 @@ export async function renderProjectDetailsPage() {
   const messageElement = page.querySelector('#projectMessage');
   const titleElement = page.querySelector('#projectTitle');
   const boardColumnsElement = page.querySelector('#projectBoardColumns');
-  const taskModalElement = page.querySelector('#taskModal');
   const taskDeleteModalElement = page.querySelector('#taskDeleteModal');
-  const taskModalLabelElement = page.querySelector('#taskModalLabel');
-  const taskFormElement = page.querySelector('#taskForm');
-  const taskTitleInput = page.querySelector('#taskTitle');
-  const taskDescriptionInput = page.querySelector('#taskDescription');
-  const taskTitleFeedback = page.querySelector('#taskTitleFeedback');
-  const taskDescriptionFeedback = page.querySelector('#taskDescriptionFeedback');
-  const taskAttachmentsInput = page.querySelector('#taskAttachmentsInput');
-  const taskAttachmentsList = page.querySelector('#taskAttachmentsList');
-  const taskDoneInput = page.querySelector('#taskDone');
-  const taskFormSubmitButton = page.querySelector('#taskFormSubmit');
   const confirmTaskDeleteButton = page.querySelector('#confirmTaskDelete');
   const taskDeleteNameElement = page.querySelector('#taskDeleteName');
   const statsElements = {
@@ -524,7 +493,6 @@ export async function renderProjectDetailsPage() {
     stages: page.querySelector('#projectStagesCount')
   };
 
-  const taskModal = new Modal(taskModalElement);
   const taskDeleteModal = new Modal(taskDeleteModalElement);
 
   const {
@@ -574,121 +542,8 @@ export async function renderProjectDetailsPage() {
   const stages = await ensureProjectStages(projectId, stagesResult.data || [], messageElement);
   const tasks = tasksResult.data || [];
   let attachmentsByTaskId = new Map();
-  let taskFormMode = 'add';
-  let activeTaskId = '';
-  let activeStageId = '';
   let pendingDeleteTaskId = '';
-  let activeTaskAttachments = [];
   let realtimeRefreshTimer = null;
-
-  const clearTaskFormValidation = () => {
-    clearFieldError(taskTitleInput, taskTitleFeedback);
-    clearFieldError(taskDescriptionInput, taskDescriptionFeedback);
-  };
-
-  const renderTaskAttachmentsList = () => {
-    if (!activeTaskAttachments.length) {
-      taskAttachmentsList.innerHTML = '<small class="text-body-secondary">No attachments yet.</small>';
-      return;
-    }
-
-    taskAttachmentsList.innerHTML = activeTaskAttachments
-      .map(
-        (attachment) => `
-          <div class="task-attachment-item">
-            <div>
-              <a href="${attachment.signed_url}" target="_blank" rel="noopener noreferrer" class="task-attachment-name">${escapeHtml(attachment.file_name || 'Attachment')}</a>
-              <div><small class="text-body-secondary">${formatFileSize(attachment.file_size)}</small></div>
-            </div>
-            <div class="task-attachment-actions">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-danger"
-                data-action="remove-attachment"
-                data-attachment-id="${attachment.id}"
-                data-attachment-path="${escapeHtml(attachment.file_path)}"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        `
-      )
-      .join('');
-  };
-
-  const loadTaskAttachments = async (taskId) => {
-    const { data: rows, error } = await supabase
-      .from('task_attachments')
-      .select('id, file_name, file_path, file_size')
-      .eq('task_id', taskId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      showMessage(messageElement, error.message || 'Failed to load attachments.', 'danger');
-      activeTaskAttachments = [];
-      renderTaskAttachmentsList();
-      return;
-    }
-
-    const attachments = rows || [];
-    const signedUrlResults = await Promise.all(
-      attachments.map((attachment) =>
-        supabase.storage.from(TASK_ATTACHMENTS_BUCKET).createSignedUrl(attachment.file_path, 3600)
-      )
-    );
-
-    activeTaskAttachments = attachments
-      .map((attachment, index) => ({
-        ...attachment,
-        signed_url: signedUrlResults[index]?.data?.signedUrl || '#'
-      }))
-      .filter((attachment) => attachment.signed_url && attachment.signed_url !== '#');
-
-    renderTaskAttachmentsList();
-  };
-
-  const uploadSelectedAttachments = async (taskId) => {
-    const selectedFiles = [...(taskAttachmentsInput.files || [])];
-
-    if (!selectedFiles.length) {
-      return { success: true };
-    }
-
-    for (const file of selectedFiles) {
-      const safeName = sanitizeFileName(file.name);
-      const filePath = `${taskId}/${crypto.randomUUID()}-${safeName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(TASK_ATTACHMENTS_BUCKET)
-        .upload(filePath, file, {
-          upsert: false,
-          contentType: file.type || 'application/octet-stream'
-        });
-
-      if (uploadError) {
-        showMessage(messageElement, uploadError.message || 'Failed to upload attachment.', 'danger');
-        return { success: false };
-      }
-
-      const { error: insertError } = await supabase.from('task_attachments').insert({
-        task_id: taskId,
-        file_name: file.name,
-        file_path: filePath,
-        mime_type: file.type || null,
-        file_size: file.size,
-        created_by: session.user.id
-      });
-
-      if (insertError) {
-        showMessage(messageElement, insertError.message || 'Failed to save attachment metadata.', 'danger');
-        return { success: false };
-      }
-    }
-
-    taskAttachmentsInput.value = '';
-    return { success: true };
-  };
 
   const rerenderBoard = () => {
     setSummary(statsElements, stages.length, tasks);
@@ -762,41 +617,93 @@ export async function renderProjectDetailsPage() {
     await refreshAttachmentsForCurrentTasks();
   };
 
-  const openAddTaskModal = (stageId) => {
-    taskFormMode = 'add';
-    activeTaskId = '';
-    activeStageId = stageId;
-    activeTaskAttachments = [];
-    taskModalLabelElement.textContent = 'Add Task';
-    taskFormSubmitButton.textContent = 'Create';
-    taskFormElement.reset();
-    clearTaskFormValidation();
-    taskDoneInput.checked = false;
-    taskAttachmentsInput.value = '';
-    renderTaskAttachmentsList();
-    taskModal.show();
-    taskTitleInput.focus();
-  };
+  const taskEditor = createTaskEditorController({
+    page,
+    supabase,
+    sessionUserId: session.user.id,
+    bucketName: TASK_ATTACHMENTS_BUCKET,
+    showMessage: (message, variant = 'secondary') => showMessage(messageElement, message, variant),
+    plainTextToHtml,
+    htmlToPlainText,
+    sanitizeFileName,
+    escapeHtml,
+    formatFileSize: (bytes) => {
+      if (!Number.isFinite(bytes) || bytes <= 0) {
+        return '0 B';
+      }
 
-  const openEditTaskModal = async (task) => {
-    taskFormMode = 'edit';
-    activeTaskId = task.id;
-    activeStageId = task.stage_id;
-    taskModalLabelElement.textContent = 'Edit Task';
-    taskFormSubmitButton.textContent = 'Update';
-    clearTaskFormValidation();
-    taskTitleInput.value = task.title || '';
-    taskDescriptionInput.value = htmlToPlainText(task.description_html || '');
-    taskDoneInput.checked = Boolean(task.done);
-    taskAttachmentsInput.value = '';
-    activeTaskAttachments = [];
-    renderTaskAttachmentsList();
-    taskModal.show();
-    taskTitleInput.focus();
-    await loadTaskAttachments(task.id);
-  };
+      const units = ['B', 'KB', 'MB', 'GB'];
+      const sizeIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+      const value = bytes / 1024 ** sizeIndex;
+      return `${value.toFixed(sizeIndex === 0 ? 0 : 1)} ${units[sizeIndex]}`;
+    },
+    onSaved: async ({ mode }) => {
+      await refreshAttachmentsForCurrentTasks();
+      rerenderBoard();
+      showMessage(messageElement, mode === 'add' ? 'Task created.' : 'Task updated.', 'success');
+    },
+    onAttachmentRemoved: async () => {
+      await refreshAttachmentsForCurrentTasks();
+      rerenderBoard();
+    }
+  });
 
-  renderTaskAttachmentsList();
+  taskEditor.setSaveHandler(async ({ mode, taskId, stageId, title, descriptionHtml, done }) => {
+    if (mode === 'add') {
+      showMessage(messageElement, 'Creating task...', 'secondary');
+
+      const orderPosition = getNextTaskOrderPosition(tasks, stageId);
+      const { data: insertedTask, error } = await supabase
+        .from('tasks')
+        .insert({
+          project_id: projectId,
+          stage_id: stageId,
+          title,
+          description_html: descriptionHtml,
+          done,
+          order_position: orderPosition
+        })
+        .select('id, stage_id, title, description_html, order_position, done')
+        .single();
+
+      if (error || !insertedTask?.id) {
+        showMessage(messageElement, error?.message || 'Failed to create task.', 'danger');
+        return { success: false, taskId: '' };
+      }
+
+      tasks.push(insertedTask);
+      return { success: true, taskId: insertedTask.id };
+    }
+
+    showMessage(messageElement, 'Updating task...', 'secondary');
+
+    const { data: updatedTask, error } = await supabase
+      .from('tasks')
+      .update({
+        title,
+        description_html: descriptionHtml,
+        done
+      })
+      .eq('id', taskId)
+      .select('id, stage_id, title, description_html, order_position, done')
+      .single();
+
+    if (error || !updatedTask?.id) {
+      showMessage(messageElement, error?.message || 'Failed to update task.', 'danger');
+      return { success: false, taskId: '' };
+    }
+
+    const existingTask = tasks.find((item) => item.id === taskId);
+    if (existingTask) {
+      existingTask.title = updatedTask.title;
+      existingTask.description_html = updatedTask.description_html;
+      existingTask.done = updatedTask.done;
+      existingTask.stage_id = updatedTask.stage_id;
+      existingTask.order_position = updatedTask.order_position;
+    }
+
+    return { success: true, taskId: updatedTask.id };
+  });
 
   boardColumnsElement.addEventListener('click', (event) => {
     const actionElement = event.target.closest('[data-action]');
@@ -819,14 +726,14 @@ export async function renderProjectDetailsPage() {
         return;
       }
 
-      openEditTaskModal(task);
+      taskEditor.openEdit(task);
       return;
     }
 
     const action = actionElement.getAttribute('data-action');
 
     if (action === 'add-task') {
-      openAddTaskModal(actionElement.getAttribute('data-stage-id'));
+      taskEditor.openAdd(actionElement.getAttribute('data-stage-id'));
       return;
     }
 
@@ -839,7 +746,7 @@ export async function renderProjectDetailsPage() {
         return;
       }
 
-      openEditTaskModal(task);
+      taskEditor.openEdit(task);
       return;
     }
 
@@ -905,162 +812,6 @@ export async function renderProjectDetailsPage() {
       })();
     }
 
-  });
-
-  taskAttachmentsList.addEventListener('click', (event) => {
-    const removeButton = event.target.closest('[data-action="remove-attachment"]');
-    if (!removeButton) {
-      return;
-    }
-
-    (async () => {
-      const attachmentId = removeButton.getAttribute('data-attachment-id');
-      const attachmentPath = removeButton.getAttribute('data-attachment-path');
-
-      if (!attachmentId || !attachmentPath) {
-        return;
-      }
-
-      removeButton.disabled = true;
-      showMessage(messageElement, 'Removing attachment...', 'secondary');
-
-      const { error: storageError } = await supabase.storage.from(TASK_ATTACHMENTS_BUCKET).remove([attachmentPath]);
-      if (storageError) {
-        showMessage(messageElement, storageError.message || 'Failed to remove attachment file.', 'danger');
-        removeButton.disabled = false;
-        return;
-      }
-
-      const { error: rowError } = await supabase.from('task_attachments').delete().eq('id', attachmentId);
-      if (rowError) {
-        showMessage(messageElement, rowError.message || 'Failed to remove attachment metadata.', 'danger');
-        removeButton.disabled = false;
-        return;
-      }
-
-      activeTaskAttachments = activeTaskAttachments.filter((attachment) => attachment.id !== attachmentId);
-      attachmentsByTaskId.set(
-        activeTaskId,
-        activeTaskAttachments.map((attachment) => ({
-          id: attachment.id,
-          file_name: attachment.file_name,
-          file_path: attachment.file_path,
-          signed_url: attachment.signed_url
-        }))
-      );
-      renderTaskAttachmentsList();
-      rerenderBoard();
-      showMessage(messageElement, 'Attachment removed.', 'success');
-    })();
-  });
-
-  taskTitleInput.addEventListener('input', () => {
-    if (taskTitleInput.classList.contains('is-invalid') && taskTitleInput.value.trim()) {
-      clearFieldError(taskTitleInput, taskTitleFeedback);
-    }
-  });
-
-  taskDescriptionInput.addEventListener('input', () => {
-    if (taskDescriptionInput.classList.contains('is-invalid')) {
-      clearFieldError(taskDescriptionInput, taskDescriptionFeedback);
-    }
-  });
-
-  taskModalElement.addEventListener('hidden.bs.modal', () => {
-    clearTaskFormValidation();
-  });
-
-  taskFormElement.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearTaskFormValidation();
-
-    const title = taskTitleInput.value.trim();
-    const descriptionHtml = plainTextToHtml(taskDescriptionInput.value.trim());
-    const done = Boolean(taskDoneInput.checked);
-
-    if (!title) {
-      setFieldError(taskTitleInput, taskTitleFeedback, 'Title is required.');
-      taskTitleInput.focus();
-      return;
-    }
-
-    taskFormSubmitButton.disabled = true;
-
-    if (taskFormMode === 'add') {
-      showMessage(messageElement, 'Creating task...', 'secondary');
-
-      const orderPosition = getNextTaskOrderPosition(tasks, activeStageId);
-      const { data: insertedTask, error } = await supabase
-        .from('tasks')
-        .insert({
-          project_id: projectId,
-          stage_id: activeStageId,
-          title,
-          description_html: descriptionHtml,
-          done,
-          order_position: orderPosition
-        })
-        .select('id, stage_id, title, description_html, order_position, done')
-        .single();
-
-      taskFormSubmitButton.disabled = false;
-
-      if (error) {
-        showMessage(messageElement, error.message || 'Failed to create task.', 'danger');
-        return;
-      }
-
-      const uploadResult = await uploadSelectedAttachments(insertedTask.id);
-      if (!uploadResult.success) {
-        taskFormSubmitButton.disabled = false;
-        return;
-      }
-
-      tasks.push(insertedTask);
-      await refreshAttachmentsForCurrentTasks();
-      taskModal.hide();
-      rerenderBoard();
-      showMessage(messageElement, 'Task created.', 'success');
-      return;
-    }
-
-    showMessage(messageElement, 'Updating task...', 'secondary');
-
-    const { data: updatedTask, error } = await supabase
-      .from('tasks')
-      .update({
-        title,
-        description_html: descriptionHtml,
-        done
-      })
-      .eq('id', activeTaskId)
-      .select('id, stage_id, title, description_html, order_position, done')
-      .single();
-
-    taskFormSubmitButton.disabled = false;
-
-    if (error) {
-      showMessage(messageElement, error.message || 'Failed to update task.', 'danger');
-      return;
-    }
-
-    const uploadResult = await uploadSelectedAttachments(activeTaskId);
-    if (!uploadResult.success) {
-      taskFormSubmitButton.disabled = false;
-      return;
-    }
-
-    const existingTask = tasks.find((item) => item.id === activeTaskId);
-    if (existingTask) {
-      existingTask.title = updatedTask.title;
-      existingTask.description_html = updatedTask.description_html;
-      existingTask.done = updatedTask.done;
-    }
-
-    await refreshAttachmentsForCurrentTasks();
-    taskModal.hide();
-    rerenderBoard();
-    showMessage(messageElement, 'Task updated.', 'success');
   });
 
   confirmTaskDeleteButton.addEventListener('click', async () => {

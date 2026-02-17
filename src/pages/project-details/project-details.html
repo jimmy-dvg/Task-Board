@@ -58,9 +58,19 @@
               <textarea id="taskDescription" name="taskDescription" class="form-control" rows="4"></textarea>
               <div id="taskDescriptionFeedback" class="invalid-feedback"></div>
             </div>
-            <div class="form-check">
-              <input id="taskDone" name="taskDone" type="checkbox" class="form-check-input" />
-              <label for="taskDone" class="form-check-label">Done</label>
+            <div class="mb-2">
+              <label class="form-label mb-2" for="taskStatusOpen">Status</label>
+              <div class="task-status-toggle" role="group" aria-label="Task status">
+                <button id="taskStatusOpen" type="button" class="btn task-status-btn" data-status-value="open" aria-pressed="true">
+                  <i class="bi bi-circle me-1" aria-hidden="true"></i>
+                  Open
+                </button>
+                <button id="taskStatusDone" type="button" class="btn task-status-btn" data-status-value="done" aria-pressed="false">
+                  <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                  Done (closed)
+                </button>
+              </div>
+              <input id="taskStatus" name="taskStatus" type="hidden" value="open" />
             </div>
 
             <hr class="my-3" />
