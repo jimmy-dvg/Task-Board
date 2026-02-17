@@ -83,6 +83,16 @@ function createStageActionButton(label, action, buttonClass = 'btn-outline-secon
   return button;
 }
 
+function isImageAttachment(attachment) {
+  const mimeType = String(attachment?.mime_type || '').toLowerCase();
+  if (mimeType.startsWith('image/')) {
+    return true;
+  }
+
+  const fileName = String(attachment?.file_name || '').toLowerCase();
+  return /\.(png|jpe?g|webp|gif|bmp|svg|ico|avif)$/i.test(fileName);
+}
+
 function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) {
   boardColumnsElement.innerHTML = '';
 
@@ -129,6 +139,17 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) 
       card.setAttribute('draggable', 'true');
       card.setAttribute('data-task-id', task.id);
 
+      const taskAttachments = attachmentsByTaskId.get(task.id) || [];
+      const coverImage = taskAttachments.find((attachment) => isImageAttachment(attachment));
+
+      if (coverImage?.signed_url) {
+        const coverImageElement = document.createElement('img');
+        coverImageElement.className = 'board-task-cover';
+        coverImageElement.src = coverImage.signed_url;
+        coverImageElement.alt = task.title || 'Task cover';
+        card.append(coverImageElement);
+      }
+
       const taskHeader = document.createElement('div');
       taskHeader.className = 'board-task-header';
 
@@ -155,7 +176,6 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) 
       const taskFiles = document.createElement('div');
       taskFiles.className = 'board-task-files';
 
-      const taskAttachments = attachmentsByTaskId.get(task.id) || [];
       if (taskAttachments.length) {
         const filesLabel = document.createElement('small');
         filesLabel.className = 'text-body-secondary';
@@ -561,7 +581,7 @@ export async function renderProjectDetailsPage() {
 
     const { data: rows, error } = await supabase
       .from('task_attachments')
-      .select('id, task_id, file_name, file_path')
+      .select('id, task_id, file_name, file_path, mime_type')
       .in('task_id', taskIds)
       .order('created_at', { ascending: true });
 
@@ -593,6 +613,7 @@ export async function renderProjectDetailsPage() {
         id: attachment.id,
         file_name: attachment.file_name,
         file_path: attachment.file_path,
+        mime_type: attachment.mime_type,
         signed_url: signedUrl
       });
     });
