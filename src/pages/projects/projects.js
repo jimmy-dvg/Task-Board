@@ -73,7 +73,7 @@ export async function renderProjectsPage() {
 
       const ownerActions = isOwner
         ? `
-            <a class="btn btn-sm btn-outline-primary" href="/project/${project.id}/edit">Edit</a>
+            <a class="btn btn-sm btn-outline-primary" href="/projects/${project.id}/edit">Edit</a>
             <a class="btn btn-sm btn-outline-info" href="/projects/${project.id}/users">Users</a>
             <button type="button" class="btn btn-sm btn-outline-danger" data-action="delete" data-project-id="${project.id}" data-project-name="${safeName}">
               Delete
@@ -82,7 +82,9 @@ export async function renderProjectsPage() {
         : '';
 
       row.innerHTML = `
-        <td class="project-title">${safeName}</td>
+        <td class="project-title">
+          <a class="link-body-emphasis text-decoration-none" href="/project/${project.id}/tasks">${safeName}</a>
+        </td>
         <td>${stats.openTasks}</td>
         <td>${stats.doneTasks}</td>
         <td>${stats.stagesCount}</td>

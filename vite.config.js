@@ -8,7 +8,7 @@ export default defineConfig({
         server.middlewares.use((req, _res, next) => {
           const requestUrl = req.url || '';
 
-          if (/^\/project\/[^/]+\/(add|edit)\/?$/.test(requestUrl)) {
+          if (/^\/projects\/new\/?$/.test(requestUrl) || /^\/projects\/[^/]+\/edit\/?$/.test(requestUrl) || /^\/project\/[^/]+\/(add|edit)\/?$/.test(requestUrl)) {
             req.url = '/project/';
           }
 
@@ -36,6 +36,7 @@ export default defineConfig({
         dashboard: 'dashboard/index.html',
         login: 'login/index.html',
         register: 'register/index.html',
+        admin: 'admin/index.html',
         projects: 'projects/index.html',
         project: 'project/index.html',
         projectTasks: 'project-tasks/index.html',

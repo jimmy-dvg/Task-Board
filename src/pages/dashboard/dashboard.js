@@ -13,6 +13,15 @@ function showMessage(messageElement, message, variant = 'secondary') {
   messageElement.textContent = message;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function renderColumns(boardColumnsElement, stages, tasks) {
   boardColumnsElement.innerHTML = '';
 
@@ -120,7 +129,7 @@ export async function renderDashboardPage() {
   wrapper.innerHTML = template;
 
   const page = wrapper.firstElementChild;
-  const projectSelect = page.querySelector('#projectSelect');
+  const projectCards = page.querySelector('#projectCards');
   const boardColumnsElement = page.querySelector('#boardColumns');
   const messageElement = page.querySelector('#dashboardMessage');
   const signOutButton = page.querySelector('#dashboardSignOut');
@@ -162,7 +171,7 @@ export async function renderDashboardPage() {
 
   if (!projects?.length) {
     showMessage(messageElement, 'No projects found for your account.', 'warning');
-    projectSelect.innerHTML = '<option value="">No projects</option>';
+    projectCards.innerHTML = '<div class="text-body-secondary">No projects</div>';
     setSummaryCounts(summaryElements, 0, []);
     setProjectLink(projectDetailsLink, '');
     boardColumnsElement.innerHTML = '';
@@ -182,17 +191,48 @@ export async function renderDashboardPage() {
 
   setSummaryCounts(summaryElements, projects.length, allUserTasks || []);
 
-  projectSelect.innerHTML = projects
-    .map((project) => `<option value="${project.id}">${project.name}</option>`)
-    .join('');
+  let selectedProjectId = projects[0].id;
 
-  setProjectLink(projectDetailsLink, projects[0].id);
+  const renderProjectCards = () => {
+    projectCards.innerHTML = projects
+      .map((project) => {
+        const isActive = project.id === selectedProjectId;
 
-  projectSelect.addEventListener('change', async () => {
-    setProjectLink(projectDetailsLink, projectSelect.value);
-    await loadProjectData(projectSelect.value, boardColumnsElement, messageElement);
+        return `
+          <button
+            type="button"
+            class="project-card ${isActive ? 'active' : ''}"
+            data-project-id="${project.id}"
+            aria-pressed="${isActive ? 'true' : 'false'}"
+          >
+            ${escapeHtml(project.name)}
+          </button>
+        `;
+      })
+      .join('');
+  };
+
+  projectCards.addEventListener('click', async (event) => {
+    const cardButton = event.target.closest('[data-project-id]');
+
+    if (!cardButton) {
+      return;
+    }
+
+    const nextProjectId = cardButton.getAttribute('data-project-id');
+
+    if (!nextProjectId || nextProjectId === selectedProjectId) {
+      return;
+    }
+
+    selectedProjectId = nextProjectId;
+    renderProjectCards();
+    setProjectLink(projectDetailsLink, selectedProjectId);
+    await loadProjectData(selectedProjectId, boardColumnsElement, messageElement);
   });
 
-  await loadProjectData(projects[0].id, boardColumnsElement, messageElement);
+  renderProjectCards();
+  setProjectLink(projectDetailsLink, selectedProjectId);
+  await loadProjectData(selectedProjectId, boardColumnsElement, messageElement);
   return page;
 }

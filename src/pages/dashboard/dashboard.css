@@ -13,6 +13,25 @@
   font-size: 1.1rem;
 }
 
+.project-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.project-card {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  background: var(--bs-body-bg);
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+}
+
+.project-card.active {
+  border-color: var(--bs-primary);
+  background: var(--bs-primary-bg-subtle);
+}
+
 .board-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

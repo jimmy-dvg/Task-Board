@@ -1,0 +1,15 @@
+.admin-project-select {
+  width: 100%;
+  max-width: 320px;
+}
+
+.admin-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.admin-col-title {
+  min-width: 220px;
+  max-width: 360px;
+  white-space: normal;
+}

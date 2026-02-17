@@ -4,7 +4,17 @@
   status = 200
 
 [[redirects]]
+  from = "/projects/new"
+  to = "/project/index.html"
+  status = 200
+
+[[redirects]]
   from = "/project/:id/edit"
+  to = "/project/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/projects/:id/edit"
   to = "/project/index.html"
   status = 200
 

@@ -1,0 +1,101 @@
+<main class="page-main py-5">
+  <section class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h3 mb-0">Admin Panel</h1>
+      <a class="btn btn-outline-primary" href="/dashboard/">Back to Dashboard</a>
+    </div>
+
+    <div id="adminMessage" class="alert d-none" role="alert"></div>
+
+    <section class="card shadow-sm mb-4" aria-labelledby="adminProjectsHeading">
+      <div class="card-body">
+        <h2 id="adminProjectsHeading" class="h5 mb-3">Projects</h2>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Owner</th>
+                <th scope="col">Created</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminProjectsTableBody">
+              <tr><td colspan="4" class="text-body-secondary">Loading projects...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm mb-4" aria-labelledby="adminStagesHeading">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center gap-2 mb-3">
+          <h2 id="adminStagesHeading" class="h5 mb-0">Project Stages</h2>
+          <select id="adminStagesProjectSelect" class="form-select form-select-sm admin-project-select" aria-label="Select project for stages"></select>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Stage</th>
+                <th scope="col">Order</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminStagesTableBody">
+              <tr><td colspan="3" class="text-body-secondary">Select a project to load stages.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm mb-4" aria-labelledby="adminTasksHeading">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-center gap-2 mb-3">
+          <h2 id="adminTasksHeading" class="h5 mb-0">Tasks</h2>
+          <select id="adminTasksProjectSelect" class="form-select form-select-sm admin-project-select" aria-label="Select project for tasks"></select>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Title</th>
+                <th scope="col">Stage</th>
+                <th scope="col">Done</th>
+                <th scope="col">Order</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminTasksTableBody">
+              <tr><td colspan="5" class="text-body-secondary">Select a project to load tasks.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="card shadow-sm" aria-labelledby="adminUsersHeading">
+      <div class="card-body">
+        <h2 id="adminUsersHeading" class="h5 mb-3">Users</h2>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Email</th>
+                <th scope="col">Role</th>
+                <th scope="col">Created</th>
+                <th scope="col">Last Sign In</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminUsersTableBody">
+              <tr><td colspan="5" class="text-body-secondary">Loading users...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>

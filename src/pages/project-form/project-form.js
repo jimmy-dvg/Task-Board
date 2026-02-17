@@ -15,7 +15,15 @@ function showMessage(messageElement, message, variant = 'secondary') {
 
 function parseProjectRoute(pathname) {
   const cleanPath = pathname.replace(/\/+$/, '');
-  const match = cleanPath.match(/^\/project\/([^/]+)\/(add|edit)$/);
+
+  if (cleanPath === '/projects/new') {
+    return {
+      projectId: null,
+      mode: 'add'
+    };
+  }
+
+  const match = cleanPath.match(/^\/projects\/([^/]+)\/edit$/);
 
   if (!match) {
     return null;
@@ -23,7 +31,7 @@ function parseProjectRoute(pathname) {
 
   return {
     projectId: decodeURIComponent(match[1]),
-    mode: match[2]
+    mode: 'edit'
   };
 }
 
