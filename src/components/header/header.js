@@ -1,6 +1,7 @@
 import template from './header.html?raw';
 import './header.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import { supabase } from '../../lib/supabase-client.js';
 
 export function renderHeader(currentPath = '/') {
   const normalizePath = (path) => {
@@ -25,5 +26,21 @@ export function renderHeader(currentPath = '/') {
     }
   });
 
-  return wrapper.firstElementChild;
+  const headerElement = wrapper.firstElementChild;
+  const dashboardNavItem = headerElement.querySelector('[data-auth-nav="dashboard"]');
+  const loggedOutOnlyNavItems = headerElement.querySelectorAll('[data-auth-nav="logged-out-only"]');
+
+  supabase.auth.getSession().then(({ data }) => {
+    const hasSession = Boolean(data?.session);
+
+    if (dashboardNavItem) {
+      dashboardNavItem.classList.toggle('d-none', !hasSession);
+    }
+
+    loggedOutOnlyNavItems.forEach((item) => {
+      item.classList.toggle('d-none', hasSession);
+    });
+  });
+
+  return headerElement;
 }

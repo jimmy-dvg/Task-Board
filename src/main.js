@@ -7,9 +7,16 @@ const app = document.querySelector('#app');
 
 document.title = 'Taskboard | Home';
 
-if (app) {
+async function initHome() {
+  if (!app) {
+    return;
+  }
+
   app.className = 'app-shell';
   app.append(renderHeader('/'));
-  app.append(renderIndexPage());
+  const indexPage = await renderIndexPage();
+  app.append(indexPage);
   app.append(renderFooter());
 }
+
+initHome();

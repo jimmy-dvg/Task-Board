@@ -1,3 +1,35 @@
 .page-main .display-6 {
   font-weight: 600;
 }
+
+.home-hero-auth {
+  border: 1px solid var(--bs-border-color);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08);
+}
+
+.home-hero-chip {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--bs-secondary-color);
+  background: var(--bs-tertiary-bg);
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.home-hero-title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.home-hero-copy {
+  font-size: 1.25rem;
+  color: var(--bs-secondary-color);
+  max-width: 980px;
+}
+
+.home-hero-actions {
+  row-gap: 0.5rem;
+}
