@@ -104,6 +104,7 @@ export async function renderProjectsPage() {
           <div class="actions-group">
             <a class="btn btn-sm btn-outline-success" href="/project/${project.id}/tasks">Add Tasks</a>
             <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/tasks">View Tasks</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/labels">By Label</a>
             ${ownerActions}
           </div>
         </td>

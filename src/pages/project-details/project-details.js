@@ -40,6 +40,10 @@ function htmlToPlainText(html) {
   return temp.textContent || '';
 }
 
+function normalizeLabelName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 function ensureEmptyStates(boardColumnsElement) {
   boardColumnsElement.querySelectorAll('.board-task-list').forEach((taskList) => {
     const cards = taskList.querySelectorAll('.board-task');
@@ -93,7 +97,7 @@ function isImageAttachment(attachment) {
   return /\.(png|jpe?g|webp|gif|bmp|svg|ico|avif)$/i.test(fileName);
 }
 
-function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) {
+function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId, labelsByTaskId) {
   boardColumnsElement.innerHTML = '';
 
   stages.forEach((stage) => {
@@ -173,6 +177,17 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) 
       status.className = task.done ? 'text-success' : 'text-body-secondary';
       status.textContent = task.done ? 'Done' : 'Open';
 
+      const taskLabels = labelsByTaskId.get(task.id) || [];
+      const labelsWrap = document.createElement('div');
+      labelsWrap.className = 'board-task-labels';
+
+      taskLabels.forEach((label) => {
+        const labelBadge = document.createElement('span');
+        labelBadge.className = 'badge text-bg-light board-task-label';
+        labelBadge.textContent = label.name;
+        labelsWrap.append(labelBadge);
+      });
+
       const taskFiles = document.createElement('div');
       taskFiles.className = 'board-task-files';
 
@@ -220,7 +235,7 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId) 
         doneButton
       );
 
-      card.append(taskHeader, description, status, taskFiles, stageActions);
+      card.append(taskHeader, description, status, labelsWrap, taskFiles, stageActions);
       taskList.append(card);
     });
 
@@ -502,6 +517,7 @@ export async function renderProjectDetailsPage() {
   const page = wrapper.firstElementChild;
   const messageElement = page.querySelector('#projectMessage');
   const titleElement = page.querySelector('#projectTitle');
+  const labelsLinkElement = page.querySelector('#projectLabelsLink');
   const boardColumnsElement = page.querySelector('#projectBoardColumns');
   const taskDeleteModalElement = page.querySelector('#taskDeleteModal');
   const confirmTaskDeleteButton = page.querySelector('#confirmTaskDelete');
@@ -531,6 +547,8 @@ export async function renderProjectDetailsPage() {
     boardColumnsElement.innerHTML = '';
     return page;
   }
+
+  labelsLinkElement.href = `/project/${projectId}/labels`;
 
   showMessage(messageElement, 'Loading project...', 'secondary');
 
@@ -562,12 +580,184 @@ export async function renderProjectDetailsPage() {
   const stages = await ensureProjectStages(projectId, stagesResult.data || [], messageElement);
   const tasks = tasksResult.data || [];
   let attachmentsByTaskId = new Map();
+  let labelsByTaskId = new Map();
   let pendingDeleteTaskId = '';
   let realtimeRefreshTimer = null;
+  let commentsRealtimeRefreshTimer = null;
+  let labelsRealtimeRefreshTimer = null;
+
+  const syncTaskLabelNamesOnTasks = () => {
+    tasks.forEach((task) => {
+      task.labelNames = (labelsByTaskId.get(task.id) || []).map((label) => label.name);
+    });
+  };
 
   const rerenderBoard = () => {
     setSummary(statsElements, stages.length, tasks);
-    renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId);
+    renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId, labelsByTaskId);
+  };
+
+  const refreshTaskLabelsForCurrentTasks = async () => {
+    const taskIds = tasks.map((task) => task.id);
+
+    if (!taskIds.length) {
+      labelsByTaskId = new Map();
+      syncTaskLabelNamesOnTasks();
+      rerenderBoard();
+      return;
+    }
+
+    const { data: taskLabelRows, error: taskLabelsError } = await supabase
+      .from('task_labels')
+      .select('task_id, label_id')
+      .in('task_id', taskIds);
+
+    if (taskLabelsError) {
+      showMessage(messageElement, taskLabelsError.message || 'Failed to refresh labels.', 'danger');
+      return;
+    }
+
+    const labelIds = [...new Set((taskLabelRows || []).map((row) => row.label_id).filter(Boolean))];
+    const labelsById = new Map();
+
+    if (labelIds.length) {
+      const { data: labelRows, error: labelsError } = await supabase
+        .from('project_labels')
+        .select('id, name')
+        .eq('project_id', projectId)
+        .in('id', labelIds);
+
+      if (labelsError) {
+        showMessage(messageElement, labelsError.message || 'Failed to refresh labels.', 'danger');
+        return;
+      }
+
+      (labelRows || []).forEach((label) => {
+        labelsById.set(label.id, label);
+      });
+    }
+
+    const mappedLabels = new Map();
+
+    (taskLabelRows || []).forEach((row) => {
+      const label = labelsById.get(row.label_id);
+      if (!label) {
+        return;
+      }
+
+      if (!mappedLabels.has(row.task_id)) {
+        mappedLabels.set(row.task_id, []);
+      }
+
+      mappedLabels.get(row.task_id).push({
+        id: label.id,
+        name: label.name
+      });
+    });
+
+    mappedLabels.forEach((taskLabels) => {
+      taskLabels.sort((firstLabel, secondLabel) =>
+        firstLabel.name.localeCompare(secondLabel.name, undefined, { sensitivity: 'base' })
+      );
+    });
+
+    labelsByTaskId = mappedLabels;
+    syncTaskLabelNamesOnTasks();
+    rerenderBoard();
+  };
+
+  const syncTaskLabels = async (taskId, labelNames) => {
+    const normalizedEntries = [];
+    const seen = new Set();
+
+    (labelNames || []).forEach((labelName) => {
+      const trimmedName = String(labelName || '').trim();
+      const normalizedName = normalizeLabelName(trimmedName);
+
+      if (!normalizedName || seen.has(normalizedName)) {
+        return;
+      }
+
+      seen.add(normalizedName);
+      normalizedEntries.push({ normalizedName, displayName: trimmedName });
+    });
+
+    const { data: projectLabels, error: projectLabelsError } = await supabase
+      .from('project_labels')
+      .select('id, name')
+      .eq('project_id', projectId);
+
+    if (projectLabelsError) {
+      showMessage(messageElement, projectLabelsError.message || 'Failed to load project labels.', 'danger');
+      return false;
+    }
+
+    let availableLabels = projectLabels || [];
+    const existingByNormalizedName = new Map(
+      availableLabels.map((label) => [normalizeLabelName(label.name), label])
+    );
+
+    const labelsToCreate = normalizedEntries
+      .filter((entry) => !existingByNormalizedName.has(entry.normalizedName))
+      .map((entry) => ({
+        project_id: projectId,
+        name: entry.displayName,
+        created_by: session.user.id
+      }));
+
+    if (labelsToCreate.length) {
+      const { error: createLabelsError } = await supabase.from('project_labels').insert(labelsToCreate);
+
+      if (createLabelsError) {
+        const duplicateError = String(createLabelsError.message || '').toLowerCase().includes('duplicate');
+        if (!duplicateError) {
+          showMessage(createLabelsError.message || 'Failed to create labels.', 'danger');
+          return false;
+        }
+      }
+
+      const { data: refreshedLabels, error: refreshedLabelsError } = await supabase
+        .from('project_labels')
+        .select('id, name')
+        .eq('project_id', projectId);
+
+      if (refreshedLabelsError) {
+        showMessage(refreshedLabelsError.message || 'Failed to refresh labels.', 'danger');
+        return false;
+      }
+
+      availableLabels = refreshedLabels || [];
+      existingByNormalizedName.clear();
+      availableLabels.forEach((label) => {
+        existingByNormalizedName.set(normalizeLabelName(label.name), label);
+      });
+    }
+
+    const desiredLabelIds = normalizedEntries
+      .map((entry) => existingByNormalizedName.get(entry.normalizedName)?.id)
+      .filter(Boolean);
+
+    const { error: clearMappingsError } = await supabase.from('task_labels').delete().eq('task_id', taskId);
+    if (clearMappingsError) {
+      showMessage(clearMappingsError.message || 'Failed to update task labels.', 'danger');
+      return false;
+    }
+
+    if (desiredLabelIds.length) {
+      const insertRows = desiredLabelIds.map((labelId) => ({
+        task_id: taskId,
+        label_id: labelId
+      }));
+
+      const { error: insertMappingsError } = await supabase.from('task_labels').insert(insertRows);
+      if (insertMappingsError) {
+        showMessage(insertMappingsError.message || 'Failed to update task labels.', 'danger');
+        return false;
+      }
+    }
+
+    await refreshTaskLabelsForCurrentTasks();
+    return true;
   };
 
   const refreshAttachmentsForCurrentTasks = async () => {
@@ -635,7 +825,7 @@ export async function renderProjectDetailsPage() {
 
     tasks.length = 0;
     tasks.push(...(latestTasks || []));
-    await refreshAttachmentsForCurrentTasks();
+    await Promise.all([refreshAttachmentsForCurrentTasks(), refreshTaskLabelsForCurrentTasks()]);
   };
 
   const taskEditor = createTaskEditorController({
@@ -659,17 +849,20 @@ export async function renderProjectDetailsPage() {
       return `${value.toFixed(sizeIndex === 0 ? 0 : 1)} ${units[sizeIndex]}`;
     },
     onSaved: async ({ mode }) => {
-      await refreshAttachmentsForCurrentTasks();
+      await Promise.all([refreshAttachmentsForCurrentTasks(), refreshTaskLabelsForCurrentTasks()]);
       rerenderBoard();
       showMessage(messageElement, mode === 'add' ? 'Task created.' : 'Task updated.', 'success');
     },
     onAttachmentRemoved: async () => {
       await refreshAttachmentsForCurrentTasks();
       rerenderBoard();
+    },
+    onCommentAdded: async () => {
+      showMessage(messageElement, '');
     }
   });
 
-  taskEditor.setSaveHandler(async ({ mode, taskId, stageId, title, descriptionHtml, done }) => {
+  taskEditor.setSaveHandler(async ({ mode, taskId, stageId, title, descriptionHtml, labelNames, done }) => {
     if (mode === 'add') {
       showMessage(messageElement, 'Creating task...', 'secondary');
 
@@ -692,7 +885,14 @@ export async function renderProjectDetailsPage() {
         return { success: false, taskId: '' };
       }
 
+      insertedTask.labelNames = labelNames || [];
       tasks.push(insertedTask);
+
+      const labelsSaved = await syncTaskLabels(insertedTask.id, labelNames || []);
+      if (!labelsSaved) {
+        showMessage(messageElement, 'Task created, but labels could not be saved.', 'warning');
+      }
+
       return { success: true, taskId: insertedTask.id };
     }
 
@@ -721,6 +921,12 @@ export async function renderProjectDetailsPage() {
       existingTask.done = updatedTask.done;
       existingTask.stage_id = updatedTask.stage_id;
       existingTask.order_position = updatedTask.order_position;
+      existingTask.labelNames = labelNames || [];
+    }
+
+    const labelsSaved = await syncTaskLabels(updatedTask.id, labelNames || []);
+    if (!labelsSaved) {
+      showMessage(messageElement, 'Task updated, but labels could not be saved.', 'warning');
     }
 
     return { success: true, taskId: updatedTask.id };
@@ -855,6 +1061,7 @@ export async function renderProjectDetailsPage() {
     const taskIndex = tasks.findIndex((item) => item.id === pendingDeleteTaskId);
     if (taskIndex >= 0) {
       attachmentsByTaskId.delete(tasks[taskIndex].id);
+      labelsByTaskId.delete(tasks[taskIndex].id);
       tasks.splice(taskIndex, 1);
     }
 
@@ -887,19 +1094,114 @@ export async function renderProjectDetailsPage() {
     )
     .subscribe();
 
+  const commentsRealtimeChannel = supabase
+    .channel(`project-task-comments-${projectId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'task_comments'
+      },
+      (payload) => {
+        const changedTaskId = payload.new?.task_id || payload.old?.task_id;
+        if (!changedTaskId) {
+          return;
+        }
+
+        const isKnownTask = tasks.some((task) => task.id === changedTaskId);
+        if (!isKnownTask || !taskEditor.isTaskOpenInEditor(changedTaskId)) {
+          return;
+        }
+
+        if (commentsRealtimeRefreshTimer) {
+          return;
+        }
+
+        commentsRealtimeRefreshTimer = window.setTimeout(async () => {
+          commentsRealtimeRefreshTimer = null;
+          await taskEditor.refreshCommentsForTask(changedTaskId);
+        }, 120);
+      }
+    )
+    .subscribe();
+
+  const labelsRealtimeChannel = supabase
+    .channel(`project-task-labels-${projectId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'task_labels'
+      },
+      (payload) => {
+        const changedTaskId = payload.new?.task_id || payload.old?.task_id;
+        if (!changedTaskId) {
+          return;
+        }
+
+        const isKnownTask = tasks.some((task) => task.id === changedTaskId);
+        if (!isKnownTask) {
+          return;
+        }
+
+        if (labelsRealtimeRefreshTimer) {
+          return;
+        }
+
+        labelsRealtimeRefreshTimer = window.setTimeout(async () => {
+          labelsRealtimeRefreshTimer = null;
+          await refreshTaskLabelsForCurrentTasks();
+        }, 120);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'project_labels',
+        filter: `project_id=eq.${projectId}`
+      },
+      () => {
+        if (labelsRealtimeRefreshTimer) {
+          return;
+        }
+
+        labelsRealtimeRefreshTimer = window.setTimeout(async () => {
+          labelsRealtimeRefreshTimer = null;
+          await refreshTaskLabelsForCurrentTasks();
+        }, 120);
+      }
+    )
+    .subscribe();
+
   const cleanupRealtime = () => {
     if (realtimeRefreshTimer) {
       window.clearTimeout(realtimeRefreshTimer);
       realtimeRefreshTimer = null;
     }
 
+    if (commentsRealtimeRefreshTimer) {
+      window.clearTimeout(commentsRealtimeRefreshTimer);
+      commentsRealtimeRefreshTimer = null;
+    }
+
+    if (labelsRealtimeRefreshTimer) {
+      window.clearTimeout(labelsRealtimeRefreshTimer);
+      labelsRealtimeRefreshTimer = null;
+    }
+
     supabase.removeChannel(realtimeChannel);
+    supabase.removeChannel(commentsRealtimeChannel);
+    supabase.removeChannel(labelsRealtimeChannel);
   };
 
   window.addEventListener('beforeunload', cleanupRealtime, { once: true });
 
   rerenderBoard();
-  await refreshAttachmentsForCurrentTasks();
+  await Promise.all([refreshAttachmentsForCurrentTasks(), refreshTaskLabelsForCurrentTasks()]);
   enableDragAndDrop(boardColumnsElement, tasks, messageElement, () => {
     rerenderBoard();
   });

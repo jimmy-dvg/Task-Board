@@ -53,17 +53,25 @@ export function createTaskEditorController({
   escapeHtml,
   formatFileSize,
   onSaved,
-  onAttachmentRemoved
+  onAttachmentRemoved,
+  onCommentAdded
 }) {
   const taskModalElement = page.querySelector('#taskModal');
   const taskModalLabelElement = page.querySelector('#taskModalLabel');
   const taskFormElement = page.querySelector('#taskForm');
   const taskTitleInput = page.querySelector('#taskTitle');
   const taskDescriptionInput = page.querySelector('#taskDescription');
+  const taskLabelsInput = page.querySelector('#taskLabels');
   const taskTitleFeedback = page.querySelector('#taskTitleFeedback');
   const taskDescriptionFeedback = page.querySelector('#taskDescriptionFeedback');
+  const taskLabelsFeedback = page.querySelector('#taskLabelsFeedback');
   const taskAttachmentsInput = page.querySelector('#taskAttachmentsInput');
   const taskAttachmentsList = page.querySelector('#taskAttachmentsList');
+  const taskDiscussionSection = page.querySelector('#taskDiscussionSection');
+  const taskCommentsList = page.querySelector('#taskCommentsList');
+  const taskCommentInput = page.querySelector('#taskCommentInput');
+  const taskCommentFeedback = page.querySelector('#taskCommentFeedback');
+  const taskCommentSubmitButton = page.querySelector('#taskCommentSubmit');
   const taskStatusInput = page.querySelector('#taskStatus');
   const taskStatusButtons = [...page.querySelectorAll('.task-status-btn')];
   const taskFormSubmitButton = page.querySelector('#taskFormSubmit');
@@ -74,6 +82,7 @@ export function createTaskEditorController({
   let activeTaskId = '';
   let activeStageId = '';
   let activeTaskAttachments = [];
+  let activeTaskComments = [];
   let saveHandler = async () => ({ success: false, taskId: '' });
 
   const clearFieldError = (inputElement, feedbackElement) => {
@@ -89,6 +98,29 @@ export function createTaskEditorController({
   const clearTaskFormValidation = () => {
     clearFieldError(taskTitleInput, taskTitleFeedback);
     clearFieldError(taskDescriptionInput, taskDescriptionFeedback);
+    clearFieldError(taskLabelsInput, taskLabelsFeedback);
+  };
+
+  const parseLabelNames = (value) => {
+    const rawNames = String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    const uniqueLower = new Set();
+    const normalizedNames = [];
+
+    rawNames.forEach((name) => {
+      const normalizedLower = name.toLowerCase();
+      if (uniqueLower.has(normalizedLower)) {
+        return;
+      }
+
+      uniqueLower.add(normalizedLower);
+      normalizedNames.push(name);
+    });
+
+    return normalizedNames;
   };
 
   const setStatus = (statusValue) => {
@@ -140,6 +172,87 @@ export function createTaskEditorController({
         `;
       })
       .join('');
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) {
+      return '';
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    return date.toLocaleString();
+  };
+
+  const renderTaskCommentsList = () => {
+    if (!activeTaskId) {
+      taskCommentsList.innerHTML = '<small class="text-body-secondary">Create this task first to start a discussion.</small>';
+      return;
+    }
+
+    if (!activeTaskComments.length) {
+      taskCommentsList.innerHTML = '<small class="text-body-secondary">No comments yet.</small>';
+      return;
+    }
+
+    taskCommentsList.innerHTML = activeTaskComments
+      .map((comment) => {
+        const safeAuthor = escapeHtml(comment.author_email || (comment.created_by === sessionUserId ? 'You' : 'Unknown'));
+        const safeTimestamp = escapeHtml(formatDateTime(comment.created_at));
+        const safeBody = escapeHtml(comment.body || '');
+
+        return `
+          <article class="task-comment-item">
+            <div class="task-comment-meta">
+              <small class="task-comment-author">${safeAuthor}</small>
+              <small class="text-body-secondary">${safeTimestamp}</small>
+            </div>
+            <p class="task-comment-body">${safeBody}</p>
+          </article>
+        `;
+      })
+      .join('');
+  };
+
+  const loadTaskComments = async (taskId) => {
+    const { data: rows, error } = await supabase
+      .from('task_comments')
+      .select('id, task_id, created_by, body, created_at')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      showMessage(error.message || 'Failed to load comments.', 'danger');
+      activeTaskComments = [];
+      renderTaskCommentsList();
+      return;
+    }
+
+    const comments = rows || [];
+    const authorIds = [...new Set(comments.map((comment) => comment.created_by).filter(Boolean))];
+    let authorById = new Map();
+
+    if (authorIds.length) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', authorIds);
+
+      if (profilesError) {
+        showMessage(profilesError.message || 'Failed to load comment authors.', 'danger');
+      } else {
+        authorById = new Map((profiles || []).map((profile) => [profile.id, profile.email]));
+      }
+    }
+
+    activeTaskComments = comments.map((comment) => ({
+      ...comment,
+      author_email: authorById.get(comment.created_by) || (comment.created_by === sessionUserId ? 'You' : 'Unknown')
+    }));
+    renderTaskCommentsList();
   };
 
   const loadTaskAttachments = async (taskId) => {
@@ -263,6 +376,12 @@ export function createTaskEditorController({
     }
   });
 
+  taskLabelsInput.addEventListener('input', () => {
+    if (taskLabelsInput.classList.contains('is-invalid')) {
+      clearFieldError(taskLabelsInput, taskLabelsFeedback);
+    }
+  });
+
   taskStatusButtons.forEach((button) => {
     button.addEventListener('click', () => {
       setStatus(button.getAttribute('data-status-value'));
@@ -271,6 +390,49 @@ export function createTaskEditorController({
 
   taskModalElement.addEventListener('hidden.bs.modal', () => {
     clearTaskFormValidation();
+    clearFieldError(taskCommentInput, taskCommentFeedback);
+    taskCommentInput.value = '';
+  });
+
+  taskCommentInput.addEventListener('input', () => {
+    if (taskCommentInput.classList.contains('is-invalid') && taskCommentInput.value.trim()) {
+      clearFieldError(taskCommentInput, taskCommentFeedback);
+    }
+  });
+
+  taskCommentSubmitButton.addEventListener('click', async () => {
+    if (!activeTaskId) {
+      return;
+    }
+
+    const body = taskCommentInput.value.trim();
+    if (!body) {
+      setFieldError(taskCommentInput, taskCommentFeedback, 'Comment cannot be empty.');
+      taskCommentInput.focus();
+      return;
+    }
+
+    taskCommentSubmitButton.disabled = true;
+    showMessage('Posting comment...', 'secondary');
+
+    const { error } = await supabase.from('task_comments').insert({
+      task_id: activeTaskId,
+      created_by: sessionUserId,
+      body
+    });
+
+    taskCommentSubmitButton.disabled = false;
+
+    if (error) {
+      showMessage(error.message || 'Failed to post comment.', 'danger');
+      return;
+    }
+
+    taskCommentInput.value = '';
+    clearFieldError(taskCommentInput, taskCommentFeedback);
+    await loadTaskComments(activeTaskId);
+    await onCommentAdded?.(activeTaskId);
+    showMessage('Comment posted.', 'success');
   });
 
   taskFormElement.addEventListener('submit', async (event) => {
@@ -279,6 +441,7 @@ export function createTaskEditorController({
 
     const title = taskTitleInput.value.trim();
     const descriptionHtml = plainTextToHtml(taskDescriptionInput.value.trim());
+    const labelNames = parseLabelNames(taskLabelsInput.value);
     const done = taskStatusInput.value === 'done';
 
     if (!title) {
@@ -295,6 +458,7 @@ export function createTaskEditorController({
       stageId: activeStageId,
       title,
       descriptionHtml,
+      labelNames,
       done
     });
 
@@ -323,13 +487,19 @@ export function createTaskEditorController({
     activeTaskId = '';
     activeStageId = stageId;
     activeTaskAttachments = [];
+    activeTaskComments = [];
     taskModalLabelElement.textContent = 'Add Task';
     taskFormSubmitButton.textContent = 'Create';
     taskFormElement.reset();
     clearTaskFormValidation();
     setStatus('open');
+    taskLabelsInput.value = '';
     taskAttachmentsInput.value = '';
     renderTaskAttachmentsList();
+    taskCommentInput.value = '';
+    clearFieldError(taskCommentInput, taskCommentFeedback);
+    renderTaskCommentsList();
+    taskDiscussionSection.classList.add('d-none');
     taskModal.show();
     taskTitleInput.focus();
   };
@@ -343,25 +513,50 @@ export function createTaskEditorController({
     clearTaskFormValidation();
     taskTitleInput.value = task.title || '';
     taskDescriptionInput.value = htmlToPlainText(task.description_html || '');
+    taskLabelsInput.value = (task.labelNames || []).join(', ');
     setStatus(task.done ? 'done' : 'open');
     taskAttachmentsInput.value = '';
     activeTaskAttachments = [];
+    activeTaskComments = [];
     renderTaskAttachmentsList();
+    renderTaskCommentsList();
+    taskCommentInput.value = '';
+    clearFieldError(taskCommentInput, taskCommentFeedback);
+    taskDiscussionSection.classList.remove('d-none');
     taskModal.show();
     taskTitleInput.focus();
-    await loadTaskAttachments(task.id);
+    await Promise.all([loadTaskAttachments(task.id), loadTaskComments(task.id)]);
   };
 
   const setSaveHandler = (handler) => {
     saveHandler = handler;
   };
 
+  const isTaskOpenInEditor = (taskId) => {
+    if (!taskId) {
+      return false;
+    }
+
+    return taskFormMode === 'edit' && activeTaskId === taskId && taskModalElement.classList.contains('show');
+  };
+
+  const refreshCommentsForTask = async (taskId) => {
+    if (!isTaskOpenInEditor(taskId)) {
+      return;
+    }
+
+    await loadTaskComments(taskId);
+  };
+
   renderTaskAttachmentsList();
+  renderTaskCommentsList();
   setStatus('open');
 
   return {
     openAdd,
     openEdit,
-    setSaveHandler
+    setSaveHandler,
+    isTaskOpenInEditor,
+    refreshCommentsForTask
   };
 }

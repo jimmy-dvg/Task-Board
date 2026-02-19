@@ -2,7 +2,10 @@
   <section class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1 id="projectTitle" class="h3 mb-0">Project</h1>
-      <a class="btn btn-outline-primary" href="/projects/">Back to Projects</a>
+      <div class="d-flex gap-2">
+        <a id="projectLabelsLink" class="btn btn-outline-secondary" href="#">View by Label</a>
+        <a class="btn btn-outline-primary" href="/projects/">Back to Projects</a>
+      </div>
     </div>
 
     <div id="projectMessage" class="alert d-none" role="alert"></div>
@@ -59,6 +62,19 @@
               <div id="taskDescriptionFeedback" class="invalid-feedback"></div>
             </div>
             <div class="mb-2">
+              <label for="taskLabels" class="form-label">Labels</label>
+              <input
+                id="taskLabels"
+                name="taskLabels"
+                type="text"
+                class="form-control"
+                placeholder="e.g. bug, backend, urgent"
+              />
+              <small class="text-body-secondary">Use comma-separated labels.</small>
+              <div id="taskLabelsFeedback" class="invalid-feedback"></div>
+            </div>
+
+            <div class="mb-2">
               <label class="form-label mb-2" for="taskStatusOpen">Status</label>
               <div class="task-status-toggle" role="group" aria-label="Task status">
                 <button id="taskStatusOpen" type="button" class="btn task-status-btn" data-status-value="open" aria-pressed="true">
@@ -89,6 +105,19 @@
             </div>
 
             <div id="taskAttachmentsList" class="task-attachments-list"></div>
+
+            <hr class="my-3" />
+
+            <section id="taskDiscussionSection" class="task-discussion-section d-none" aria-label="Task discussion">
+              <h3 class="h6 mb-2">Discussion</h3>
+              <div id="taskCommentsList" class="task-comments-list"></div>
+              <label for="taskCommentInput" class="form-label mt-3">Add comment</label>
+              <textarea id="taskCommentInput" name="taskCommentInput" class="form-control" rows="3" placeholder="Write a comment..."></textarea>
+              <div id="taskCommentFeedback" class="invalid-feedback"></div>
+              <div class="d-flex justify-content-end mt-2">
+                <button id="taskCommentSubmit" type="button" class="btn btn-sm btn-outline-primary">Post comment</button>
+              </div>
+            </section>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

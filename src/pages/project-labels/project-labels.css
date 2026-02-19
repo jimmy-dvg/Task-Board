@@ -1,0 +1,23 @@
+.labels-toolbar {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bs-body-bg);
+}
+
+.labels-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.label-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.label-filter-count {
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color);
+}

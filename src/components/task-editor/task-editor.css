@@ -84,3 +84,36 @@
   display: inline-flex;
   gap: 0.4rem;
 }
+
+.task-comments-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.task-comment-item {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--bs-body-bg);
+}
+
+.task-comment-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.task-comment-author {
+  font-weight: 600;
+  color: var(--bs-emphasis-color);
+}
+
+.task-comment-body {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--bs-body-color);
+}
