@@ -9,3 +9,17 @@
 .activity-action-pill {
   font-weight: 500;
 }
+
+.activity-live-status {
+  min-width: 6rem;
+  text-align: center;
+}
+
+.activity-live-status.is-live {
+  background: var(--bs-success) !important;
+}
+
+.activity-live-status.is-connecting {
+  background: var(--bs-warning) !important;
+  color: var(--bs-dark) !important;
+}

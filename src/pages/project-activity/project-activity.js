@@ -90,6 +90,7 @@ export async function renderProjectActivityPage() {
   const page = wrapper.firstElementChild;
   const messageElement = page.querySelector('#activityMessage');
   const projectNameElement = page.querySelector('#activityProjectName');
+  const activityLiveStatusElement = page.querySelector('#activityLiveStatus');
   const activityBoardLink = page.querySelector('#activityBoardLink');
   const activityActionFilter = page.querySelector('#activityActionFilter');
   const activityTableBody = page.querySelector('#activityTableBody');
@@ -113,65 +114,42 @@ export async function renderProjectActivityPage() {
 
   activityBoardLink.href = `/project/${projectId}/tasks`;
 
-  showMessage(messageElement, 'Loading activity...', 'secondary');
-
-  const [projectResult, logsResult] = await Promise.all([
-    supabase.from('projects').select('id, name').eq('id', projectId).single(),
-    supabase
-      .from('task_activity_logs')
-      .select('id, task_id, actor_id, action, details, created_at')
-      .eq('project_id', projectId)
-      .order('created_at', { ascending: false })
-      .limit(500)
-  ]);
-
-  if (projectResult.error || logsResult.error) {
-    showMessage(messageElement, projectResult.error?.message || logsResult.error?.message || 'Failed to load activity.', 'danger');
-    activityTableBody.innerHTML = '<tr><td colspan="5" class="text-body-secondary">Unable to load activity logs.</td></tr>';
-    return page;
-  }
-
-  const logs = logsResult.data || [];
-  projectNameElement.textContent = projectResult.data?.name ? `Project: ${projectResult.data.name}` : 'Project';
-
-  if (!logs.length) {
-    activityActionFilter.innerHTML = '<option value="">All actions</option>';
-    activityTableBody.innerHTML = '<tr><td colspan="5" class="text-body-secondary">No task activity yet.</td></tr>';
-    showMessage(messageElement, '');
-    return page;
-  }
-
-  const actorIds = [...new Set(logs.map((log) => log.actor_id).filter(Boolean))];
+  let logs = [];
   let actorById = new Map();
+  let refreshTimer = null;
+  let isRefreshing = false;
 
-  if (actorIds.length) {
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, email')
-      .in('id', actorIds);
+  const setLiveStatus = (status) => {
+    const normalizedStatus = String(status || '').toUpperCase();
 
-    if (profilesError) {
-      showMessage(messageElement, profilesError.message || 'Failed to load activity authors.', 'danger');
-    } else {
-      actorById = new Map((profiles || []).map((profile) => [profile.id, profile.email]));
+    activityLiveStatusElement.classList.remove('is-live', 'is-connecting');
+
+    if (normalizedStatus === 'SUBSCRIBED') {
+      activityLiveStatusElement.textContent = 'Live';
+      activityLiveStatusElement.classList.add('is-live');
+      activityLiveStatusElement.title = 'Realtime connected';
+      return;
     }
-  }
 
-  const actions = [...new Set(logs.map((log) => log.action).filter(Boolean))].sort((a, b) =>
-    formatActionLabel(a).localeCompare(formatActionLabel(b), undefined, { sensitivity: 'base' })
-  );
+    if (normalizedStatus === 'CHANNEL_ERROR' || normalizedStatus === 'TIMED_OUT') {
+      activityLiveStatusElement.textContent = 'Reconnecting';
+      activityLiveStatusElement.classList.add('is-connecting');
+      activityLiveStatusElement.title = 'Realtime reconnecting';
+      return;
+    }
 
-  activityActionFilter.innerHTML = [
-    '<option value="">All actions</option>',
-    ...actions.map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(formatActionLabel(action))}</option>`)
-  ].join('');
+    activityLiveStatusElement.textContent = 'Offline';
+    activityLiveStatusElement.title = 'Realtime disconnected';
+  };
 
   const renderRows = () => {
     const actionFilter = activityActionFilter.value;
     const filteredLogs = actionFilter ? logs.filter((log) => log.action === actionFilter) : logs;
 
     if (!filteredLogs.length) {
-      activityTableBody.innerHTML = '<tr><td colspan="5" class="text-body-secondary">No activity for this action.</td></tr>';
+      activityTableBody.innerHTML = actionFilter
+        ? '<tr><td colspan="5" class="text-body-secondary">No activity for this action.</td></tr>'
+        : '<tr><td colspan="5" class="text-body-secondary">No task activity yet.</td></tr>';
       return;
     }
 
@@ -196,10 +174,132 @@ export async function renderProjectActivityPage() {
       .join('');
   };
 
+  const renderActionFilterOptions = () => {
+    const selectedAction = activityActionFilter.value;
+    const actions = [...new Set(logs.map((log) => log.action).filter(Boolean))].sort((a, b) =>
+      formatActionLabel(a).localeCompare(formatActionLabel(b), undefined, { sensitivity: 'base' })
+    );
+
+    activityActionFilter.innerHTML = [
+      '<option value="">All actions</option>',
+      ...actions.map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(formatActionLabel(action))}</option>`)
+    ].join('');
+
+    if (selectedAction && actions.includes(selectedAction)) {
+      activityActionFilter.value = selectedAction;
+    } else {
+      activityActionFilter.value = '';
+    }
+  };
+
+  const loadActivity = async ({ showLoading = false } = {}) => {
+    if (isRefreshing) {
+      return;
+    }
+
+    isRefreshing = true;
+
+    if (showLoading) {
+      showMessage(messageElement, 'Loading activity...', 'secondary');
+    }
+
+    const { data: logRows, error: logsError } = await supabase
+      .from('task_activity_logs')
+      .select('id, task_id, actor_id, action, details, created_at')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (logsError) {
+      showMessage(messageElement, logsError.message || 'Failed to load activity.', 'danger');
+      activityTableBody.innerHTML = '<tr><td colspan="5" class="text-body-secondary">Unable to load activity logs.</td></tr>';
+      isRefreshing = false;
+      return;
+    }
+
+    logs = logRows || [];
+    const actorIds = [...new Set(logs.map((log) => log.actor_id).filter(Boolean))];
+
+    if (actorIds.length) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', actorIds);
+
+      if (profilesError) {
+        showMessage(messageElement, profilesError.message || 'Failed to load activity authors.', 'danger');
+        actorById = new Map();
+      } else {
+        actorById = new Map((profiles || []).map((profile) => [profile.id, profile.email]));
+      }
+    } else {
+      actorById = new Map();
+    }
+
+    renderActionFilterOptions();
+    renderRows();
+    showMessage(messageElement, '');
+    isRefreshing = false;
+  };
+
+  showMessage(messageElement, 'Loading activity...', 'secondary');
+
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('id, name')
+    .eq('id', projectId)
+    .single();
+
+  if (projectError) {
+    showMessage(messageElement, projectError.message || 'Failed to load activity.', 'danger');
+    activityTableBody.innerHTML = '<tr><td colspan="5" class="text-body-secondary">Unable to load activity logs.</td></tr>';
+    return page;
+  }
+
+  projectNameElement.textContent = project?.name ? `Project: ${project.name}` : 'Project';
+
   activityActionFilter.addEventListener('change', renderRows);
 
-  renderRows();
-  showMessage(messageElement, '');
+  await loadActivity({ showLoading: false });
+
+  const activityRealtimeChannel = supabase
+    .channel(`project-task-activity-${projectId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'task_activity_logs',
+        filter: `project_id=eq.${projectId}`
+      },
+      () => {
+        if (refreshTimer) {
+          return;
+        }
+
+        refreshTimer = window.setTimeout(async () => {
+          refreshTimer = null;
+          await loadActivity();
+        }, 150);
+      }
+    )
+    .subscribe((status) => {
+      setLiveStatus(status);
+    });
+
+  setLiveStatus('CHANNEL_ERROR');
+
+  const cleanupRealtime = () => {
+    if (refreshTimer) {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+
+    setLiveStatus('CLOSED');
+    supabase.removeChannel(activityRealtimeChannel);
+  };
+
+  window.addEventListener('beforeunload', cleanupRealtime, { once: true });
 
   return page;
 }
