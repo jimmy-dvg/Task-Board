@@ -62,9 +62,11 @@ export function createTaskEditorController({
   const taskTitleInput = page.querySelector('#taskTitle');
   const taskDescriptionInput = page.querySelector('#taskDescription');
   const taskLabelsInput = page.querySelector('#taskLabels');
+  const taskDeadlineDateInput = page.querySelector('#taskDeadlineDate');
   const taskTitleFeedback = page.querySelector('#taskTitleFeedback');
   const taskDescriptionFeedback = page.querySelector('#taskDescriptionFeedback');
   const taskLabelsFeedback = page.querySelector('#taskLabelsFeedback');
+  const taskDeadlineDateFeedback = page.querySelector('#taskDeadlineDateFeedback');
   const taskAttachmentsInput = page.querySelector('#taskAttachmentsInput');
   const taskAttachmentsList = page.querySelector('#taskAttachmentsList');
   const taskDiscussionSection = page.querySelector('#taskDiscussionSection');
@@ -99,6 +101,7 @@ export function createTaskEditorController({
     clearFieldError(taskTitleInput, taskTitleFeedback);
     clearFieldError(taskDescriptionInput, taskDescriptionFeedback);
     clearFieldError(taskLabelsInput, taskLabelsFeedback);
+    clearFieldError(taskDeadlineDateInput, taskDeadlineDateFeedback);
   };
 
   const parseLabelNames = (value) => {
@@ -382,6 +385,12 @@ export function createTaskEditorController({
     }
   });
 
+  taskDeadlineDateInput.addEventListener('input', () => {
+    if (taskDeadlineDateInput.classList.contains('is-invalid')) {
+      clearFieldError(taskDeadlineDateInput, taskDeadlineDateFeedback);
+    }
+  });
+
   taskStatusButtons.forEach((button) => {
     button.addEventListener('click', () => {
       setStatus(button.getAttribute('data-status-value'));
@@ -442,6 +451,7 @@ export function createTaskEditorController({
     const title = taskTitleInput.value.trim();
     const descriptionHtml = plainTextToHtml(taskDescriptionInput.value.trim());
     const labelNames = parseLabelNames(taskLabelsInput.value);
+    const deadlineDate = String(taskDeadlineDateInput.value || '').trim();
     const done = taskStatusInput.value === 'done';
 
     if (!title) {
@@ -459,6 +469,7 @@ export function createTaskEditorController({
       title,
       descriptionHtml,
       labelNames,
+      deadlineDate,
       done
     });
 
@@ -494,6 +505,7 @@ export function createTaskEditorController({
     clearTaskFormValidation();
     setStatus('open');
     taskLabelsInput.value = '';
+    taskDeadlineDateInput.value = '';
     taskAttachmentsInput.value = '';
     renderTaskAttachmentsList();
     taskCommentInput.value = '';
@@ -514,6 +526,7 @@ export function createTaskEditorController({
     taskTitleInput.value = task.title || '';
     taskDescriptionInput.value = htmlToPlainText(task.description_html || '');
     taskLabelsInput.value = (task.labelNames || []).join(', ');
+    taskDeadlineDateInput.value = task.deadline_date || '';
     setStatus(task.done ? 'done' : 'open');
     taskAttachmentsInput.value = '';
     activeTaskAttachments = [];

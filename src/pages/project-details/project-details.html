@@ -3,6 +3,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h1 id="projectTitle" class="h3 mb-0">Project</h1>
       <div class="d-flex gap-2">
+        <a id="projectDeadlinesLink" class="btn btn-outline-secondary" href="#">View by Deadline</a>
         <a id="projectLabelsLink" class="btn btn-outline-secondary" href="#">View by Label</a>
         <a class="btn btn-outline-primary" href="/projects/">Back to Projects</a>
       </div>
@@ -82,6 +83,17 @@
               />
               <small class="text-body-secondary">Use comma-separated labels.</small>
               <div id="taskLabelsFeedback" class="invalid-feedback"></div>
+            </div>
+
+            <div class="mb-2">
+              <label for="taskDeadlineDate" class="form-label">Deadline</label>
+              <input
+                id="taskDeadlineDate"
+                name="taskDeadlineDate"
+                type="date"
+                class="form-control"
+              />
+              <div id="taskDeadlineDateFeedback" class="invalid-feedback"></div>
             </div>
 
             <div class="mb-2">

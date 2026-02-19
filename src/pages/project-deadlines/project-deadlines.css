@@ -1,0 +1,12 @@
+.deadlines-toolbar {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bs-body-bg);
+  max-width: 280px;
+}
+
+.deadline-overdue {
+  color: var(--bs-danger);
+  font-weight: 600;
+}

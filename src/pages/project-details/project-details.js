@@ -44,6 +44,29 @@ function normalizeLabelName(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function getTodayIsoDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDeadlineDate(deadlineDate) {
+  const text = String(deadlineDate || '').trim();
+
+  if (!text) {
+    return '';
+  }
+
+  const date = new Date(`${text}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return text;
+  }
+
+  return date.toLocaleDateString();
+}
+
 function ensureEmptyStates(boardColumnsElement) {
   boardColumnsElement.querySelectorAll('.board-task-list').forEach((taskList) => {
     const cards = taskList.querySelectorAll('.board-task');
@@ -99,6 +122,7 @@ function isImageAttachment(attachment) {
 
 function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId, labelsByTaskId) {
   boardColumnsElement.innerHTML = '';
+  const todayIsoDate = getTodayIsoDate();
 
   stages.forEach((stage) => {
     const column = document.createElement('section');
@@ -177,6 +201,17 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId, 
       status.className = task.done ? 'text-success' : 'text-body-secondary';
       status.textContent = task.done ? 'Done' : 'Open';
 
+      const deadlineMeta = document.createElement('small');
+      deadlineMeta.className = 'text-body-secondary';
+
+      if (task.deadline_date) {
+        const isOverdue = !task.done && String(task.deadline_date) < todayIsoDate;
+        deadlineMeta.className = isOverdue ? 'text-danger fw-semibold' : 'text-body-secondary';
+        deadlineMeta.textContent = `Due ${formatDeadlineDate(task.deadline_date)}`;
+      } else {
+        deadlineMeta.textContent = 'No deadline';
+      }
+
       const taskLabels = labelsByTaskId.get(task.id) || [];
       const labelsWrap = document.createElement('div');
       labelsWrap.className = 'board-task-labels';
@@ -235,7 +270,7 @@ function renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId, 
         doneButton
       );
 
-      card.append(taskHeader, description, status, labelsWrap, taskFiles, stageActions);
+      card.append(taskHeader, description, status, deadlineMeta, labelsWrap, taskFiles, stageActions);
       taskList.append(card);
     });
 
@@ -522,6 +557,7 @@ export async function renderProjectDetailsPage() {
   const page = wrapper.firstElementChild;
   const messageElement = page.querySelector('#projectMessage');
   const titleElement = page.querySelector('#projectTitle');
+  const deadlinesLinkElement = page.querySelector('#projectDeadlinesLink');
   const labelsLinkElement = page.querySelector('#projectLabelsLink');
   const boardLabelFilterElement = page.querySelector('#boardLabelFilter');
   const boardLabelFilterClearElement = page.querySelector('#boardLabelFilterClear');
@@ -555,6 +591,7 @@ export async function renderProjectDetailsPage() {
     return page;
   }
 
+  deadlinesLinkElement.href = `/project/${projectId}/deadlines`;
   labelsLinkElement.href = `/project/${projectId}/labels`;
 
   showMessage(messageElement, 'Loading project...', 'secondary');
@@ -568,7 +605,7 @@ export async function renderProjectDetailsPage() {
       .order('order_position', { ascending: true }),
     supabase
       .from('tasks')
-      .select('id, stage_id, title, description_html, order_position, done')
+      .select('id, stage_id, title, description_html, order_position, done, deadline_date')
       .eq('project_id', projectId)
   ]);
 
@@ -874,7 +911,7 @@ export async function renderProjectDetailsPage() {
   const refreshTasksFromDatabase = async () => {
     const { data: latestTasks, error } = await supabase
       .from('tasks')
-      .select('id, stage_id, title, description_html, order_position, done')
+      .select('id, stage_id, title, description_html, order_position, done, deadline_date')
       .eq('project_id', projectId);
 
     if (error) {
@@ -921,7 +958,7 @@ export async function renderProjectDetailsPage() {
     }
   });
 
-  taskEditor.setSaveHandler(async ({ mode, taskId, stageId, title, descriptionHtml, labelNames, done }) => {
+  taskEditor.setSaveHandler(async ({ mode, taskId, stageId, title, descriptionHtml, labelNames, deadlineDate, done }) => {
     if (mode === 'add') {
       showMessage(messageElement, 'Creating task...', 'secondary');
 
@@ -933,10 +970,11 @@ export async function renderProjectDetailsPage() {
           stage_id: stageId,
           title,
           description_html: descriptionHtml,
+          deadline_date: deadlineDate || null,
           done,
           order_position: orderPosition
         })
-        .select('id, stage_id, title, description_html, order_position, done')
+        .select('id, stage_id, title, description_html, order_position, done, deadline_date')
         .single();
 
       if (error || !insertedTask?.id) {
@@ -962,10 +1000,11 @@ export async function renderProjectDetailsPage() {
       .update({
         title,
         description_html: descriptionHtml,
+        deadline_date: deadlineDate || null,
         done
       })
       .eq('id', taskId)
-      .select('id, stage_id, title, description_html, order_position, done')
+      .select('id, stage_id, title, description_html, order_position, done, deadline_date')
       .single();
 
     if (error || !updatedTask?.id) {
@@ -978,6 +1017,7 @@ export async function renderProjectDetailsPage() {
       existingTask.title = updatedTask.title;
       existingTask.description_html = updatedTask.description_html;
       existingTask.done = updatedTask.done;
+      existingTask.deadline_date = updatedTask.deadline_date;
       existingTask.stage_id = updatedTask.stage_id;
       existingTask.order_position = updatedTask.order_position;
       existingTask.labelNames = labelNames || [];

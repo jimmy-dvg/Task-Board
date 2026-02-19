@@ -1,0 +1,44 @@
+<main class="page-main py-5">
+  <section class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h3 mb-0">Tasks by Deadline</h1>
+      <div class="d-flex gap-2">
+        <a id="deadlinesBoardLink" class="btn btn-outline-secondary" href="#">Back to Board</a>
+        <a class="btn btn-outline-primary" href="/projects/">Back to Projects</a>
+      </div>
+    </div>
+
+    <p id="deadlinesProjectName" class="text-body-secondary mb-2"></p>
+    <div id="deadlinesMessage" class="alert d-none" role="alert"></div>
+
+    <div class="deadlines-toolbar mb-3">
+      <label for="deadlineFilter" class="form-label mb-1">View</label>
+      <select id="deadlineFilter" class="form-select form-select-sm" aria-label="Deadline filter">
+        <option value="all">All tasks</option>
+        <option value="overdue">Overdue</option>
+        <option value="today">Due today</option>
+        <option value="next7">Next 7 days</option>
+        <option value="none">No deadline</option>
+      </select>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Task</th>
+            <th scope="col">Deadline</th>
+            <th scope="col">Stage</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="deadlinesTasksTableBody">
+          <tr>
+            <td colspan="5" class="text-body-secondary">Loading tasks...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
