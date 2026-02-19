@@ -37,6 +37,16 @@
       </div>
     </div>
 
+    <div class="board-filters mb-3">
+      <label for="boardLabelFilter" class="form-label mb-1">Filter by label</label>
+      <div class="d-flex gap-2 align-items-center">
+        <select id="boardLabelFilter" class="form-select form-select-sm" aria-label="Filter tasks by label">
+          <option value="">All labels</option>
+        </select>
+        <button id="boardLabelFilterClear" type="button" class="btn btn-sm btn-outline-secondary d-none">Clear</button>
+      </div>
+    </div>
+
     <div id="projectBoardViewport" class="board-viewport">
       <div id="projectBoardColumns" class="board-columns"></div>
     </div>

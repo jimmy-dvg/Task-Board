@@ -9,6 +9,17 @@
   font-size: 1.1rem;
 }
 
+.board-filters {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--bs-body-bg);
+}
+
+.board-filters .form-select {
+  max-width: 280px;
+}
+
 .board-viewport {
   overflow: auto;
   max-height: 65vh;

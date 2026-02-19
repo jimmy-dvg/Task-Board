@@ -360,7 +360,7 @@ async function persistTaskOrder(boardColumnsElement, tasks, messageElement) {
   return { success: true };
 }
 
-function enableDragAndDrop(boardColumnsElement, tasks, messageElement, onPersistError) {
+function enableDragAndDrop(boardColumnsElement, tasks, messageElement, onPersistError, canDragTasks = () => true) {
   let dragStarted = false;
   let isSaving = false;
 
@@ -368,6 +368,11 @@ function enableDragAndDrop(boardColumnsElement, tasks, messageElement, onPersist
     const cardElement = event.target.closest('.board-task');
 
     if (!cardElement) {
+      return;
+    }
+
+    if (!canDragTasks()) {
+      event.preventDefault();
       return;
     }
 
@@ -518,6 +523,8 @@ export async function renderProjectDetailsPage() {
   const messageElement = page.querySelector('#projectMessage');
   const titleElement = page.querySelector('#projectTitle');
   const labelsLinkElement = page.querySelector('#projectLabelsLink');
+  const boardLabelFilterElement = page.querySelector('#boardLabelFilter');
+  const boardLabelFilterClearElement = page.querySelector('#boardLabelFilterClear');
   const boardColumnsElement = page.querySelector('#projectBoardColumns');
   const taskDeleteModalElement = page.querySelector('#taskDeleteModal');
   const confirmTaskDeleteButton = page.querySelector('#confirmTaskDelete');
@@ -585,6 +592,7 @@ export async function renderProjectDetailsPage() {
   let realtimeRefreshTimer = null;
   let commentsRealtimeRefreshTimer = null;
   let labelsRealtimeRefreshTimer = null;
+  let activeLabelFilterId = '';
 
   const syncTaskLabelNamesOnTasks = () => {
     tasks.forEach((task) => {
@@ -592,9 +600,60 @@ export async function renderProjectDetailsPage() {
     });
   };
 
+  const getAvailableBoardLabels = () => {
+    const labelMap = new Map();
+
+    labelsByTaskId.forEach((taskLabels) => {
+      taskLabels.forEach((label) => {
+        if (!label?.id || !label?.name) {
+          return;
+        }
+
+        if (!labelMap.has(label.id)) {
+          labelMap.set(label.id, { id: label.id, name: label.name });
+        }
+      });
+    });
+
+    return [...labelMap.values()].sort((firstLabel, secondLabel) =>
+      firstLabel.name.localeCompare(secondLabel.name, undefined, { sensitivity: 'base' })
+    );
+  };
+
+  const getFilteredTasks = () => {
+    if (!activeLabelFilterId) {
+      return tasks;
+    }
+
+    return tasks.filter((task) => {
+      const taskLabels = labelsByTaskId.get(task.id) || [];
+      return taskLabels.some((label) => label.id === activeLabelFilterId);
+    });
+  };
+
+  const renderBoardLabelFilter = () => {
+    const availableLabels = getAvailableBoardLabels();
+    const hasActiveFilter = Boolean(activeLabelFilterId);
+    const selectedFilterExists = availableLabels.some((label) => label.id === activeLabelFilterId);
+
+    if (hasActiveFilter && !selectedFilterExists) {
+      activeLabelFilterId = '';
+    }
+
+    boardLabelFilterElement.innerHTML = [
+      '<option value="">All labels</option>',
+      ...availableLabels.map((label) => `<option value="${label.id}">${escapeHtml(label.name)}</option>`)
+    ].join('');
+
+    boardLabelFilterElement.value = activeLabelFilterId;
+    boardLabelFilterClearElement.classList.toggle('d-none', !activeLabelFilterId);
+    boardLabelFilterElement.disabled = availableLabels.length === 0;
+  };
+
   const rerenderBoard = () => {
     setSummary(statsElements, stages.length, tasks);
-    renderColumns(boardColumnsElement, stages, tasks, attachmentsByTaskId, labelsByTaskId);
+    renderBoardLabelFilter();
+    renderColumns(boardColumnsElement, stages, getFilteredTasks(), attachmentsByTaskId, labelsByTaskId);
   };
 
   const refreshTaskLabelsForCurrentTasks = async () => {
@@ -1041,6 +1100,21 @@ export async function renderProjectDetailsPage() {
 
   });
 
+  boardLabelFilterElement.addEventListener('change', () => {
+    activeLabelFilterId = boardLabelFilterElement.value || '';
+    rerenderBoard();
+  });
+
+  boardLabelFilterClearElement.addEventListener('click', () => {
+    if (!activeLabelFilterId) {
+      return;
+    }
+
+    activeLabelFilterId = '';
+    boardLabelFilterElement.value = '';
+    rerenderBoard();
+  });
+
   confirmTaskDeleteButton.addEventListener('click', async () => {
     if (!pendingDeleteTaskId) {
       return;
@@ -1204,7 +1278,7 @@ export async function renderProjectDetailsPage() {
   await Promise.all([refreshAttachmentsForCurrentTasks(), refreshTaskLabelsForCurrentTasks()]);
   enableDragAndDrop(boardColumnsElement, tasks, messageElement, () => {
     rerenderBoard();
-  });
+  }, () => !activeLabelFilterId);
   showMessage(messageElement, '');
 
   return page;
