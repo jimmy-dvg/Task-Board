@@ -34,6 +34,11 @@
   status = 200
 
 [[redirects]]
+  from = "/project/:id/activity"
+  to = "/project-activity/index.html"
+  status = 200
+
+[[redirects]]
   from = "/projects/:id/users"
   to = "/project-users/index.html"
   status = 200

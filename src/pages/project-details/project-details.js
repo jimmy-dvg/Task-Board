@@ -557,6 +557,7 @@ export async function renderProjectDetailsPage() {
   const page = wrapper.firstElementChild;
   const messageElement = page.querySelector('#projectMessage');
   const titleElement = page.querySelector('#projectTitle');
+  const activityLinkElement = page.querySelector('#projectActivityLink');
   const deadlinesLinkElement = page.querySelector('#projectDeadlinesLink');
   const labelsLinkElement = page.querySelector('#projectLabelsLink');
   const boardLabelFilterElement = page.querySelector('#boardLabelFilter');
@@ -591,6 +592,7 @@ export async function renderProjectDetailsPage() {
     return page;
   }
 
+  activityLinkElement.href = `/project/${projectId}/activity`;
   deadlinesLinkElement.href = `/project/${projectId}/deadlines`;
   labelsLinkElement.href = `/project/${projectId}/labels`;
 

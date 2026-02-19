@@ -106,6 +106,7 @@ export async function renderProjectsPage() {
             <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/tasks">View Tasks</a>
             <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/labels">By Label</a>
             <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/deadlines">By Deadline</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/project/${project.id}/activity">Activity</a>
             ${ownerActions}
           </div>
         </td>

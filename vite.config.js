@@ -24,6 +24,10 @@ export default defineConfig({
             req.url = '/project-deadlines/';
           }
 
+          if (/^\/project\/[^/]+\/activity\/?$/.test(requestUrl)) {
+            req.url = '/project-activity/';
+          }
+
           if (/^\/projects\/[^/]+\/users\/?$/.test(requestUrl)) {
             req.url = '/project-users/';
           }
@@ -50,6 +54,7 @@ export default defineConfig({
         projectTasks: 'project-tasks/index.html',
         projectLabels: 'project-labels/index.html',
         projectDeadlines: 'project-deadlines/index.html',
+        projectActivity: 'project-activity/index.html',
         projectUsers: 'project-users/index.html'
       }
     }
